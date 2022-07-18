@@ -148,6 +148,10 @@ typedef enum {
  */
 extern const lv_obj_class_t lv_obj_class;
 
+#if LV_USE_OBJ_DRAW_CACHE
+struct _lv_obj_draw_cache_t;
+#endif
+
 /**
  * Special, rarely used attributes.
  * They are allocated automatically if any elements is set.
@@ -156,6 +160,10 @@ typedef struct {
     struct _lv_obj_t ** children;       /**< Store the pointer of the children in an array.*/
     uint32_t child_cnt;                 /**< Number of children*/
     lv_group_t * group_p;
+
+#if LV_USE_OBJ_DRAW_CACHE
+    struct _lv_obj_draw_cache_t * draw_cache; /**< Draw cache context*/
+#endif
 
     struct _lv_event_dsc_t * event_dsc; /**< Dynamically allocated event callback and user data array*/
     lv_point_t scroll;                  /**< The current X/Y scroll offset*/

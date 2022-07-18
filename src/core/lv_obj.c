@@ -527,6 +527,11 @@ static void lv_obj_destructor(const lv_obj_class_t * class_p, lv_obj_t * obj)
     /*Remove the animations from this object*/
     lv_anim_del(obj, NULL);
 
+#if LV_USE_OBJ_DRAW_CACHE
+    /*Free the image from the draw cache*/
+    _lv_obj_draw_cache_free(obj);
+#endif
+
     /*Delete from the group*/
     lv_group_t * group = lv_obj_get_group(obj);
     if(group) lv_group_remove_obj(obj);
