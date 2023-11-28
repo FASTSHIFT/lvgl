@@ -596,6 +596,10 @@ static void refr_area(const lv_area_t * area_p)
     lv_layer_t * layer = disp_refr->layer_head;
     layer->draw_buf = disp_refr->buf_act;
 
+#if LV_DRAW_TRANSFORM_USE_MATRIX
+    lv_matrix_identity(&layer->matrix);
+#endif
+
     /*With full refresh just redraw directly into the buffer*/
     /*In direct mode draw directly on the absolute coordinates of the buffer*/
     if(disp_refr->render_mode != LV_DISPLAY_RENDER_MODE_PARTIAL) {
@@ -883,18 +887,74 @@ static bool alpha_test_area_on_obj(lv_obj_t * obj, const lv_area_t * area)
     else return true;
 }
 
-void refr_obj(lv_layer_t * layer, lv_obj_t * obj)
+#if LV_DRAW_TRANSFORM_USE_MATRIX
+
+static void refr_obj_matrix(lv_layer_t * layer, lv_obj_t * obj)
+{
+    lv_matrix_t ori_matrix = layer->matrix;
+    lv_matrix_t obj_matrix;
+    lv_matrix_identity(&obj_matrix);
+
+    int32_t pivot_x = obj->coords.x1 + lv_obj_get_style_transform_pivot_x(obj, 0);
+    int32_t pivot_y = obj->coords.y1 + lv_obj_get_style_transform_pivot_y(obj, 0);
+    int32_t rotation = lv_obj_get_style_transform_rotation(obj, 0);
+    int32_t scale_x = lv_obj_get_style_transform_scale_x(obj, 0);
+    int32_t scale_y = lv_obj_get_style_transform_scale_y(obj, 0);
+    int32_t skew_x = lv_obj_get_style_transform_skew_x(obj, 0);
+    int32_t skew_y = lv_obj_get_style_transform_skew_y(obj, 0);
+
+    /* generate the obj matrix */
+    lv_matrix_translate(&obj_matrix, pivot_x, pivot_y);
+    if(rotation != 0) {
+        lv_matrix_rotate(&obj_matrix, rotation * 0.1f);
+    }
+
+    if(scale_x != LV_SCALE_NONE || scale_y != LV_SCALE_NONE) {
+        lv_matrix_scale(
+            &obj_matrix,
+            (float)scale_x / LV_SCALE_NONE,
+            (float)scale_y / LV_SCALE_NONE
+        );
+    }
+
+    if(skew_x != 0 || skew_y != 0) {
+        lv_matrix_skew(&obj_matrix, skew_x, skew_y);
+    }
+
+    lv_matrix_translate(&obj_matrix, -pivot_x, -pivot_y);
+
+    /* apply the obj matrix */
+    lv_matrix_multiply(&layer->matrix, &obj_matrix);
+
+    /* redraw obj */
+    lv_obj_redraw(layer, obj);
+
+    /* restore original matrix */
+    layer->matrix = ori_matrix;
+}
+
+#endif /* LV_DRAW_TRANSFORM_USE_MATRIX */
+
+static void refr_obj(lv_layer_t * layer, lv_obj_t * obj)
 {
     if(lv_obj_has_flag(obj, LV_OBJ_FLAG_HIDDEN)) return;
+
+    lv_opa_t opa = lv_obj_get_style_opa_layered(obj, 0);
+    if(opa < LV_OPA_MIN) return;
+
+#if LV_DRAW_TRANSFORM_USE_MATRIX
+    /*If the layer opa is full then use the matrix transform*/
+    if(opa >= LV_OPA_MAX) {
+        refr_obj_matrix(layer, obj);
+        return;
+    }
+#endif /* LV_DRAW_TRANSFORM_USE_MATRIX */
 
     lv_layer_type_t layer_type = _lv_obj_get_layer_type(obj);
     if(layer_type == LV_LAYER_TYPE_NONE) {
         lv_obj_redraw(layer, obj);
     }
     else {
-        lv_opa_t opa = lv_obj_get_style_opa_layered(obj, 0);
-        if(opa < LV_OPA_MIN) return;
-
         lv_area_t layer_area_full;
         lv_area_t obj_draw_size;
         lv_result_t res = layer_get_area(layer, obj, layer_type, &layer_area_full, &obj_draw_size);

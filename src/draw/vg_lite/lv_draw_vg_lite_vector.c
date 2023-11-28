@@ -30,7 +30,6 @@
  **********************/
 
 static void task_draw_cb(void * ctx, const lv_vector_path_t * path, const lv_vector_draw_dsc_t * dsc);
-static void lv_matrix_to_vg(vg_lite_matrix_t * desy, const lv_matrix_t * src);
 static void lv_path_to_vg(lv_vg_lite_path_t * dest, const lv_vector_path_t * src);
 static void lv_path_opa_to_vg(lv_vg_lite_path_t * dest, const lv_vector_draw_dsc_t * dsc);
 static void lv_stroke_to_vg(lv_vg_lite_path_t * dest, const lv_vector_stroke_dsc_t * dsc);
@@ -104,7 +103,7 @@ static void task_draw_cb(void * ctx, const lv_vector_path_t * path, const lv_vec
 
     /* transform matrix */
     vg_lite_matrix_t matrix;
-    lv_matrix_to_vg(&matrix, &dsc->matrix);
+    lv_vg_lite_matrix(&matrix, &dsc->matrix);
     LV_VG_LITE_ASSERT_MATRIX(&matrix);
 
     /* convert path */
@@ -176,7 +175,7 @@ static void task_draw_cb(void * ctx, const lv_vector_path_t * path, const lv_vec
                     lv_matrix_multiply(&m, &dsc->fill_dsc.matrix);
 
                     vg_lite_matrix_t pattern_matrix;
-                    lv_matrix_to_vg(&pattern_matrix, &m);
+                    lv_vg_lite_matrix(&pattern_matrix, &m);
 
                     vg_lite_color_t recolor = lv_vg_lite_color(dsc->fill_dsc.img_dsc.recolor, dsc->fill_dsc.img_dsc.recolor_opa, true);
 
@@ -211,7 +210,7 @@ static void task_draw_cb(void * ctx, const lv_vector_path_t * path, const lv_vec
                     lv_area_set(&grad_area, (int32_t)min_x, (int32_t)min_y, (int32_t)max_x, (int32_t)max_y);
                     lv_vg_lite_grad_area_to_matrix(&grad_matrix, &grad_area, LV_GRAD_DIR_HOR);
 
-                    lv_matrix_to_vg(&fill_matrix, &dsc->fill_dsc.matrix);
+                    lv_vg_lite_matrix(&fill_matrix, &dsc->fill_dsc.matrix);
                     lv_vg_lite_matrix_multiply(&grad_matrix, &matrix);
                     lv_vg_lite_matrix_multiply(&grad_matrix, &fill_matrix);
 
@@ -227,7 +226,7 @@ static void task_draw_cb(void * ctx, const lv_vector_path_t * path, const lv_vec
                 }
                 else if(style == LV_VECTOR_GRADIENT_STYLE_RADIAL) {
                     vg_lite_matrix_t grad_matrix;
-                    lv_matrix_to_vg(&grad_matrix, &dsc->fill_dsc.matrix);
+                    lv_vg_lite_matrix(&grad_matrix, &dsc->fill_dsc.matrix);
 
                     /* add min_x, min_y to gradient center */
                     lv_vector_gradient_t new_grad = dsc->fill_dsc.gradient;
@@ -263,11 +262,6 @@ static void task_draw_cb(void * ctx, const lv_vector_path_t * path, const lv_vec
     }
 
     LV_PROFILER_END;
-}
-
-static void lv_matrix_to_vg(vg_lite_matrix_t * dest, const lv_matrix_t * src)
-{
-    lv_memcpy(dest, src, sizeof(lv_matrix_t));
 }
 
 static vg_lite_quality_t lv_quality_to_vg(lv_vector_path_quality_t quality)
