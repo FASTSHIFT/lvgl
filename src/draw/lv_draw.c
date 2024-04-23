@@ -349,6 +349,10 @@ lv_layer_t * lv_draw_layer_create(lv_layer_t * parent_layer, lv_color_format_t c
     new_layer->buf_area = *area;
     new_layer->color_format = color_format;
 
+#if LV_DRAW_TRANSFORM_USE_MATRIX
+    lv_matrix_identity(&new_layer->matrix);
+#endif
+
     if(disp->layer_head) {
         lv_layer_t * tail = disp->layer_head;
         while(tail->next) tail = tail->next;

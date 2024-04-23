@@ -895,8 +895,20 @@ static void refr_obj_matrix(lv_layer_t * layer, lv_obj_t * obj)
     lv_matrix_t obj_matrix;
     lv_matrix_identity(&obj_matrix);
 
-    int32_t pivot_x = obj->coords.x1 + lv_obj_get_style_transform_pivot_x(obj, 0);
-    int32_t pivot_y = obj->coords.y1 + lv_obj_get_style_transform_pivot_y(obj, 0);
+    lv_point_t pivot = {
+        .x = lv_obj_get_style_transform_pivot_x(obj, 0),
+        .y = lv_obj_get_style_transform_pivot_y(obj, 0)
+    };
+
+    if(LV_COORD_IS_PCT(pivot.x)) {
+        pivot.x = (LV_COORD_GET_PCT(pivot.x) * lv_area_get_width(&obj->coords)) / 100;
+    }
+    if(LV_COORD_IS_PCT(pivot.y)) {
+        pivot.y = (LV_COORD_GET_PCT(pivot.y) * lv_area_get_height(&obj->coords)) / 100;
+    }
+    pivot.x = obj->coords.x1 + pivot.x;
+    pivot.y = obj->coords.y1 + pivot.y;
+
     int32_t rotation = lv_obj_get_style_transform_rotation(obj, 0);
     int32_t scale_x = lv_obj_get_style_transform_scale_x(obj, 0);
     int32_t scale_y = lv_obj_get_style_transform_scale_y(obj, 0);
@@ -904,7 +916,7 @@ static void refr_obj_matrix(lv_layer_t * layer, lv_obj_t * obj)
     int32_t skew_y = lv_obj_get_style_transform_skew_y(obj, 0);
 
     /* generate the obj matrix */
-    lv_matrix_translate(&obj_matrix, pivot_x, pivot_y);
+    lv_matrix_translate(&obj_matrix, pivot.x, pivot.y);
     if(rotation != 0) {
         lv_matrix_rotate(&obj_matrix, rotation * 0.1f);
     }
@@ -921,16 +933,30 @@ static void refr_obj_matrix(lv_layer_t * layer, lv_obj_t * obj)
         lv_matrix_skew(&obj_matrix, skew_x, skew_y);
     }
 
-    lv_matrix_translate(&obj_matrix, -pivot_x, -pivot_y);
+    lv_matrix_translate(&obj_matrix, -pivot.x, -pivot.y);
 
     /* apply the obj matrix */
     lv_matrix_multiply(&layer->matrix, &obj_matrix);
+
+    /* calculate clip area without transform */
+    lv_matrix_t matrix_reverse;
+    lv_matrix_inverse(&matrix_reverse, &obj_matrix);
+
+    lv_area_t clip_area = layer->_clip_area;
+    lv_area_t clip_area_ori = layer->_clip_area;
+    clip_area = lv_matrix_transform_area(&matrix_reverse, &clip_area);
+    /* increase the clip area by 1 pixel to avoid rounding errors */
+    lv_area_increase(&clip_area, 1, 1);
+    layer->_clip_area = clip_area;
 
     /* redraw obj */
     lv_obj_redraw(layer, obj);
 
     /* restore original matrix */
     layer->matrix = ori_matrix;
+    /* restore clip area */
+    layer->_clip_area = clip_area_ori;
+
 }
 
 #endif /* LV_DRAW_TRANSFORM_USE_MATRIX */

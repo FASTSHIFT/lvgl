@@ -18,6 +18,9 @@ extern "C" {
 
 #if LV_USE_MATRIX
 
+#include <stdbool.h>
+#include "lv_area.h"
+
 /*********************
  *      DEFINES
  *********************/
@@ -77,6 +80,30 @@ void lv_matrix_skew(lv_matrix_t * matrix, float skew_x, float skew_y);
  * @param matrix2          pointer to another matrix
  */
 void lv_matrix_multiply(lv_matrix_t * matrix, const lv_matrix_t * matrix2);
+
+/**
+ * Invert the matrix
+ * @param matrix           pointer to a matrix
+ * @param m                pointer to another matrix (optional)
+ * @return true: the matrix is invertible, false: the matrix is singular and cannot be inverted
+ */
+bool lv_matrix_inverse(lv_matrix_t * matrix, const lv_matrix_t * m);
+
+/**
+ * Transform a point by a matrix
+ * @param matrix           pointer to a matrix
+ * @param point            pointer to a point
+ * @return the transformed point
+ */
+lv_point_precise_t lv_matrix_transform_precise_point(const lv_matrix_t * matrix, const lv_point_precise_t * point);
+
+/**
+ * Transform an area by a matrix
+ * @param matrix           pointer to a matrix
+ * @param area             pointer to an area
+ * @return the transformed area
+ */
+lv_area_t lv_matrix_transform_area(const lv_matrix_t * matrix, const lv_area_t * area);
 
 /**********************
  *      MACROS
