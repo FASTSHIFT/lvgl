@@ -1130,6 +1130,33 @@ static void layout_update_core(lv_obj_t * obj)
 
 static void transform_point_array(const lv_obj_t * obj, lv_point_t * p, size_t p_count, bool inv)
 {
+    const lv_matrix_t * style_matrix = lv_obj_get_style_transform_matrix(obj, 0);
+    if(style_matrix) {
+        lv_matrix_t m;
+        lv_matrix_identity(&m);
+        lv_matrix_translate(&m, obj->coords.x1, obj->coords.y1);
+        lv_matrix_multiply(&m, style_matrix);
+        lv_matrix_translate(&m, -obj->coords.x1, -obj->coords.y1);
+
+        if(inv) {
+            lv_matrix_t inv_m;
+            lv_matrix_inverse(&inv_m, &m);
+            m = inv_m;
+        }
+
+        for(size_t i = 0; i < p_count; i++) {
+            lv_point_precise_t p_precise = {
+                .x = p[i].x,
+                .y = p[i].y
+            };
+            lv_point_precise_t res = lv_matrix_transform_precise_point(&m, &p_precise);
+            p[i].x = res.x;
+            p[i].y = res.y;
+        }
+
+        return;
+    }
+
     int32_t angle = lv_obj_get_style_transform_rotation(obj, 0);
     int32_t scale_x = lv_obj_get_style_transform_scale_x_safe(obj, 0);
     int32_t scale_y = lv_obj_get_style_transform_scale_y_safe(obj, 0);

@@ -56,6 +56,8 @@ void lv_style_set_transform_skew_x(lv_style_t * style, int32_t value);
 LV_ATTRIBUTE_EXTERN_DATA extern const lv_style_prop_t _lv_style_const_prop_id_TRANSFORM_SKEW_X;
 void lv_style_set_transform_skew_y(lv_style_t * style, int32_t value);
 LV_ATTRIBUTE_EXTERN_DATA extern const lv_style_prop_t _lv_style_const_prop_id_TRANSFORM_SKEW_Y;
+void lv_style_set_transform_matrix(lv_style_t * style, const lv_matrix_t * value);
+LV_ATTRIBUTE_EXTERN_DATA extern const lv_style_prop_t _lv_style_const_prop_id_TRANSFORM_MATRIX;
 void lv_style_set_pad_top(lv_style_t * style, int32_t value);
 LV_ATTRIBUTE_EXTERN_DATA extern const lv_style_prop_t _lv_style_const_prop_id_PAD_TOP;
 void lv_style_set_pad_bottom(lv_style_t * style, int32_t value);
@@ -344,6 +346,11 @@ LV_ATTRIBUTE_EXTERN_DATA extern const lv_style_prop_t _lv_style_const_prop_id_GR
 #define LV_STYLE_CONST_TRANSFORM_SKEW_Y(val) \
     { \
         .prop_ptr = &_lv_style_const_prop_id_TRANSFORM_SKEW_Y, .value = { .num = (int32_t)val } \
+    }
+
+#define LV_STYLE_CONST_TRANSFORM_MATRIX(val) \
+    { \
+        .prop_ptr = &_lv_style_const_prop_id_TRANSFORM_MATRIX, .value = { .ptr = val } \
     }
 
 #define LV_STYLE_CONST_PAD_TOP(val) \

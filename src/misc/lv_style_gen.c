@@ -220,6 +220,16 @@ void lv_style_set_transform_skew_y(lv_style_t * style, int32_t value)
 
 const lv_style_prop_t _lv_style_const_prop_id_TRANSFORM_SKEW_Y = LV_STYLE_TRANSFORM_SKEW_Y;
 
+void lv_style_set_transform_matrix(lv_style_t * style, const lv_matrix_t * value)
+{
+    lv_style_value_t v = {
+        .ptr = value
+    };
+    lv_style_set_prop(style, LV_STYLE_TRANSFORM_MATRIX, v);
+}
+
+const lv_style_prop_t _lv_style_const_prop_id_TRANSFORM_MATRIX = LV_STYLE_TRANSFORM_MATRIX;
+
 void lv_style_set_pad_top(lv_style_t * style, int32_t value)
 {
     lv_style_value_t v = {

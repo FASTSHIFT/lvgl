@@ -903,39 +903,53 @@ static void refr_obj_matrix(lv_layer_t * layer, lv_obj_t * obj)
     lv_matrix_t obj_matrix;
     lv_matrix_identity(&obj_matrix);
 
-    lv_point_t pivot = {
-        .x = lv_obj_get_style_transform_pivot_x(obj, 0),
-        .y = lv_obj_get_style_transform_pivot_y(obj, 0)
-    };
-
-    pivot.x = obj->coords.x1 + lv_pct_to_px(pivot.x, lv_area_get_width(&obj->coords));
-    pivot.y = obj->coords.y1 + lv_pct_to_px(pivot.y, lv_area_get_height(&obj->coords));
-
-    int32_t rotation = lv_obj_get_style_transform_rotation(obj, 0);
-    int32_t scale_x = lv_obj_get_style_transform_scale_x(obj, 0);
-    int32_t scale_y = lv_obj_get_style_transform_scale_y(obj, 0);
-    int32_t skew_x = lv_obj_get_style_transform_skew_x(obj, 0);
-    int32_t skew_y = lv_obj_get_style_transform_skew_y(obj, 0);
-
-    /* generate the obj matrix */
-    lv_matrix_translate(&obj_matrix, pivot.x, pivot.y);
-    if(rotation != 0) {
-        lv_matrix_rotate(&obj_matrix, rotation * 0.1f);
+    const lv_matrix_t * style_matrix = lv_obj_get_style_transform_matrix(obj, 0);
+    if(style_matrix) {
+        lv_matrix_translate(&obj_matrix, obj->coords.x1, obj->coords.y1);
+        lv_matrix_multiply(&obj_matrix, style_matrix);
+        lv_matrix_translate(&obj_matrix, -obj->coords.x1, -obj->coords.y1);
     }
+    else {
+        lv_point_t pivot = {
+            .x = lv_obj_get_style_transform_pivot_x(obj, 0),
+            .y = lv_obj_get_style_transform_pivot_y(obj, 0)
+        };
 
-    if(scale_x != LV_SCALE_NONE || scale_y != LV_SCALE_NONE) {
-        lv_matrix_scale(
-            &obj_matrix,
-            (float)scale_x / LV_SCALE_NONE,
-            (float)scale_y / LV_SCALE_NONE
-        );
+        if(LV_COORD_IS_PCT(pivot.x)) {
+            pivot.x = (LV_COORD_GET_PCT(pivot.x) * lv_area_get_width(&obj->coords)) / 100;
+        }
+        if(LV_COORD_IS_PCT(pivot.y)) {
+            pivot.y = (LV_COORD_GET_PCT(pivot.y) * lv_area_get_height(&obj->coords)) / 100;
+        }
+        pivot.x = obj->coords.x1 + pivot.x;
+        pivot.y = obj->coords.y1 + pivot.y;
+
+        int32_t rotation = lv_obj_get_style_transform_rotation(obj, 0);
+        int32_t scale_x = lv_obj_get_style_transform_scale_x(obj, 0);
+        int32_t scale_y = lv_obj_get_style_transform_scale_y(obj, 0);
+        int32_t skew_x = lv_obj_get_style_transform_skew_x(obj, 0);
+        int32_t skew_y = lv_obj_get_style_transform_skew_y(obj, 0);
+
+        /* generate the obj matrix */
+        lv_matrix_translate(&obj_matrix, pivot.x, pivot.y);
+        if(rotation != 0) {
+            lv_matrix_rotate(&obj_matrix, rotation * 0.1f);
+        }
+
+        if(scale_x != LV_SCALE_NONE || scale_y != LV_SCALE_NONE) {
+            lv_matrix_scale(
+                &obj_matrix,
+                (float)scale_x / LV_SCALE_NONE,
+                (float)scale_y / LV_SCALE_NONE
+            );
+        }
+
+        if(skew_x != 0 || skew_y != 0) {
+            lv_matrix_skew(&obj_matrix, skew_x, skew_y);
+        }
+
+        lv_matrix_translate(&obj_matrix, -pivot.x, -pivot.y);
     }
-
-    if(skew_x != 0 || skew_y != 0) {
-        lv_matrix_skew(&obj_matrix, skew_x, skew_y);
-    }
-
-    lv_matrix_translate(&obj_matrix, -pivot.x, -pivot.y);
 
     /* apply the obj matrix */
     lv_matrix_multiply(&layer->matrix, &obj_matrix);

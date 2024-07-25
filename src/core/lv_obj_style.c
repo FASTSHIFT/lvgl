@@ -953,6 +953,7 @@ static void trans_anim_completed_cb(lv_anim_t * a)
 
 static lv_layer_type_t calculate_layer_type(lv_obj_t * obj)
 {
+    if(lv_obj_get_style_transform_matrix(obj, 0) != NULL) return LV_LAYER_TYPE_TRANSFORM;
     if(lv_obj_get_style_transform_rotation(obj, 0) != 0) return LV_LAYER_TYPE_TRANSFORM;
     if(lv_obj_get_style_transform_scale_x(obj, 0) != 256) return LV_LAYER_TYPE_TRANSFORM;
     if(lv_obj_get_style_transform_scale_y(obj, 0) != 256) return LV_LAYER_TYPE_TRANSFORM;
