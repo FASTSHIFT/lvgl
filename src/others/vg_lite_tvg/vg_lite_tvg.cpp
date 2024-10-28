@@ -157,6 +157,11 @@ class vg_lite_ctx
         vg_lite_buffer_format_t target_format;
         vg_lite_rectangle_t scissor_rect;
         bool scissor_is_set;
+        struct {
+            vg_lite_float_t w0;
+            vg_lite_float_t w1;
+            vg_lite_float_t w2;
+        } gaussian_blur;
 
     public:
         vg_lite_ctx()
@@ -166,6 +171,7 @@ class vg_lite_ctx
             , target_format { VG_LITE_BGRA8888 }
             , scissor_rect { 0, 0, 0, 0 }
             , scissor_is_set { false }
+            , gaussian_blur { 0.0f, 0.0f, 0.0f }
             , clut_2colors { 0 }
             , clut_4colors { 0 }
             , clut_16colors { 0 }
@@ -304,7 +310,7 @@ static Result shape_append_rect(std::unique_ptr<Shape> & shape, const vg_lite_bu
                                 const vg_lite_rectangle_t * rect);
 static Result canvas_set_target(vg_lite_ctx * ctx, vg_lite_buffer_t * target);
 static Result picture_load(vg_lite_ctx * ctx, std::unique_ptr<Picture> & picture, const vg_lite_buffer_t * source,
-                           vg_lite_color_t color = 0);
+                           vg_lite_color_t color = 0, vg_lite_filter_t filter = VG_LITE_FILTER_BI_LINEAR);
 
 static inline bool math_zero(float a)
 {
@@ -611,13 +617,12 @@ extern "C" {
                                  vg_lite_color_t color,
                                  vg_lite_filter_t filter)
     {
-        LV_UNUSED(filter);
         auto ctx = vg_lite_ctx::get_instance();
         canvas_set_target(ctx, target);
 
         auto picture = Picture::gen();
 
-        TVG_CHECK_RETURN_VG_ERROR(picture_load(ctx, picture, source, color));
+        TVG_CHECK_RETURN_VG_ERROR(picture_load(ctx, picture, source, color, filter));
         TVG_CHECK_RETURN_VG_ERROR(picture->transform(matrix_conv(matrix)));
         TVG_CHECK_RETURN_VG_ERROR(picture->blend(blend_method_conv(blend)));
         TVG_CHECK_RETURN_VG_ERROR(ctx->canvas->push(std::move(picture)));
@@ -653,7 +658,6 @@ extern "C" {
                                       vg_lite_color_t color,
                                       vg_lite_filter_t filter)
     {
-        LV_UNUSED(filter);
         auto ctx = vg_lite_ctx::get_instance();
         TVG_CHECK_RETURN_VG_ERROR(canvas_set_target(ctx, target));
 
@@ -662,7 +666,7 @@ extern "C" {
         TVG_CHECK_RETURN_VG_ERROR(shape->transform(matrix_conv(matrix)));
 
         auto picture = tvg::Picture::gen();
-        TVG_CHECK_RETURN_VG_ERROR(picture_load(ctx, picture, source, color));
+        TVG_CHECK_RETURN_VG_ERROR(picture_load(ctx, picture, source, color, filter));
         TVG_CHECK_RETURN_VG_ERROR(picture->transform(matrix_conv(matrix)));
         TVG_CHECK_RETURN_VG_ERROR(picture->blend(blend_method_conv(blend)));
         TVG_CHECK_RETURN_VG_ERROR(picture->composite(std::move(shape), CompositeMethod::ClipPath));
@@ -986,6 +990,7 @@ extern "C" {
             case gcFEATURE_BIT_VG_RADIAL_GRADIENT:
             case gcFEATURE_BIT_VG_IM_REPEAT_REFLECT:
             case gcFEATURE_BIT_VG_SCISSOR:
+            case gcFEATURE_BIT_VG_GAUSSIAN_BLUR:
 
 #if LV_VG_LITE_THORVG_LVGL_BLEND_SUPPORT
             case gcFEATURE_BIT_VG_LVGL_SUPPORT:
@@ -1130,7 +1135,6 @@ extern "C" {
     {
         LV_UNUSED(pattern_mode);
         LV_UNUSED(pattern_color);
-        LV_UNUSED(filter);
 
         auto ctx = vg_lite_ctx::get_instance();
         TVG_CHECK_RETURN_VG_ERROR(canvas_set_target(ctx, target));
@@ -1141,7 +1145,7 @@ extern "C" {
         TVG_CHECK_RETURN_VG_ERROR(shape->transform(matrix_conv(path_matrix)));
 
         auto picture = tvg::Picture::gen();
-        TVG_CHECK_RETURN_VG_ERROR(picture_load(ctx, picture, pattern_image, color));
+        TVG_CHECK_RETURN_VG_ERROR(picture_load(ctx, picture, pattern_image, color, filter));
         TVG_CHECK_RETURN_VG_ERROR(picture->transform(matrix_conv(pattern_matrix)));
         TVG_CHECK_RETURN_VG_ERROR(picture->blend(blend_method_conv(blend)));
         TVG_CHECK_RETURN_VG_ERROR(picture->composite(std::move(shape), CompositeMethod::ClipPath));
@@ -2122,6 +2126,19 @@ Empty_sequence_handler:
         return VG_LITE_NOT_SUPPORT;
     }
 
+    vg_lite_error_t vg_lite_gaussian_filter(vg_lite_float_t w0, vg_lite_float_t w1, vg_lite_float_t w2)
+    {
+        if(!vg_lite_query_feature(gcFEATURE_BIT_VG_GAUSSIAN_BLUR)) {
+            return VG_LITE_NOT_SUPPORT;
+        }
+
+        auto ctx = vg_lite_ctx::get_instance();
+        ctx->gaussian_blur.w0 = w0;
+        ctx->gaussian_blur.w1 = w1;
+        ctx->gaussian_blur.w2 = w2;
+        return VG_LITE_SUCCESS;
+    }
+
     vg_lite_error_t vg_lite_get_parameter(vg_lite_param_type_t type,
                                           vg_lite_int32_t count,
                                           vg_lite_float_t * params)
@@ -2592,126 +2609,138 @@ static bool decode_indexed_line(
     return true;
 }
 
-static Result picture_load(vg_lite_ctx * ctx, std::unique_ptr<Picture> & picture, const vg_lite_buffer_t * source,
-                           vg_lite_color_t color)
+static void apply_gaussian_blur_filter(vg_color32_t * dst,
+                                       vg_lite_uint32_t w, vg_lite_uint32_t h, vg_lite_uint32_t stride,
+                                       vg_lite_float_t w0, vg_lite_float_t w1, vg_lite_float_t w2)
 {
-    vg_lite_uint32_t * image_buffer;
+}
+
+static Result picture_load(vg_lite_ctx * ctx, std::unique_ptr<Picture> & picture, const vg_lite_buffer_t * source,
+                           vg_lite_color_t color, vg_lite_filter_t filter)
+{
     LV_ASSERT(VG_LITE_IS_ALIGNED(source->memory, LV_VG_LITE_THORVG_BUF_ADDR_ALIGN));
 
-#if LV_VG_LITE_THORVG_16PIXELS_ALIGN
-    LV_ASSERT(VG_LITE_IS_ALIGNED(source->width, 16));
-#endif
-
-    if(source->format == VG_LITE_BGRA8888 && source->image_mode == VG_LITE_NORMAL_IMAGE_MODE) {
-        image_buffer = (vg_lite_uint32_t *)source->memory;
+    if(vg_lite_query_feature(gcFEATURE_BIT_VG_16PIXELS_ALIGN)) {
+        LV_ASSERT(VG_LITE_IS_ALIGNED(source->width, 16));
     }
-    else {
-        vg_lite_uint32_t width = source->width;
-        vg_lite_uint32_t height = source->height;
-        vg_lite_uint32_t px_size = width * height;
-        image_buffer = ctx->get_image_buffer(width, height);
 
-        vg_lite_buffer_t target;
-        memset(&target, 0, sizeof(target));
-        target.memory = image_buffer;
-        target.format = VG_LITE_BGRA8888;
-        target.width = width;
-        target.height = height;
-        target.stride = width_to_stride(width, target.format);
+    if(source->format == VG_LITE_BGRA8888
+       && source->image_mode == VG_LITE_NORMAL_IMAGE_MODE
+       && filter != VG_LITE_FILTER_GAUSSIAN) {
+        TVG_CHECK_RETURN_RESULT(picture->load((uint32_t *)source->memory, source->width, source->height, true));
+        return Result::Success;
+    }
 
-        switch(source->format) {
-            case VG_LITE_INDEX_1:
-            case VG_LITE_INDEX_2:
-            case VG_LITE_INDEX_4:
-            case VG_LITE_INDEX_8: {
-                    const vg_lite_uint32_t * clut_colors = ctx->get_CLUT(source->format);
-                    for(vg_lite_uint32_t y = 0; y < height; y++) {
-                        decode_indexed_line(source->format, clut_colors, 0, y, width, (uint8_t *)source->memory, image_buffer);
-                    }
+    vg_lite_uint32_t width = source->width;
+    vg_lite_uint32_t height = source->height;
+    vg_lite_uint32_t px_size = width * height;
+    vg_lite_uint32_t * image_buffer = ctx->get_image_buffer(width, height);
+
+    vg_lite_buffer_t target;
+    memset(&target, 0, sizeof(target));
+    target.memory = image_buffer;
+    target.format = VG_LITE_BGRA8888;
+    target.width = width;
+    target.height = height;
+    target.stride = width_to_stride(width, target.format);
+
+    switch(source->format) {
+        case VG_LITE_INDEX_1:
+        case VG_LITE_INDEX_2:
+        case VG_LITE_INDEX_4:
+        case VG_LITE_INDEX_8: {
+                const vg_lite_uint32_t * clut_colors = ctx->get_CLUT(source->format);
+                for(vg_lite_uint32_t y = 0; y < height; y++) {
+                    decode_indexed_line(source->format, clut_colors, 0, y, width, (uint8_t *)source->memory, image_buffer);
                 }
-                break;
+            }
+            break;
 
-            case VG_LITE_A4: {
-                    conv_alpha4_to_bgra8888.convert(&target, source, color);
-                }
-                break;
+        case VG_LITE_A4: {
+                conv_alpha4_to_bgra8888.convert(&target, source, color);
+            }
+            break;
 
-            case VG_LITE_A8: {
-                    conv_alpha8_to_bgra8888.convert(&target, source, color);
-                }
-                break;
+        case VG_LITE_A8: {
+                conv_alpha8_to_bgra8888.convert(&target, source, color);
+            }
+            break;
 
-            case VG_LITE_L8: {
-                    conv_l8_to_bgra8888.convert(&target, source);
-                }
-                break;
+        case VG_LITE_L8: {
+                conv_l8_to_bgra8888.convert(&target, source);
+            }
+            break;
 
-            case VG_LITE_BGRX8888: {
-                    conv_bgrx8888_to_bgra8888.convert(&target, source);
-                }
-                break;
+        case VG_LITE_BGRX8888: {
+                conv_bgrx8888_to_bgra8888.convert(&target, source);
+            }
+            break;
 
-            case VG_LITE_BGR888: {
-                    conv_bgr888_to_bgra8888.convert(&target, source);
-                }
-                break;
+        case VG_LITE_BGR888: {
+                conv_bgr888_to_bgra8888.convert(&target, source);
+            }
+            break;
 
-            case VG_LITE_BGRA5658: {
-                    conv_bgra5658_to_bgra8888.convert(&target, source);
-                }
-                break;
+        case VG_LITE_BGRA5658: {
+                conv_bgra5658_to_bgra8888.convert(&target, source);
+            }
+            break;
 
-            case VG_LITE_BGR565: {
-                    conv_bgr565_to_bgra8888.convert(&target, source);
-                }
-                break;
+        case VG_LITE_BGR565: {
+                conv_bgr565_to_bgra8888.convert(&target, source);
+            }
+            break;
 
-            case VG_LITE_BGRA5551: {
-                    conv_bgra5551_to_bgra8888.convert(&target, source);
-                }
-                break;
+        case VG_LITE_BGRA5551: {
+                conv_bgra5551_to_bgra8888.convert(&target, source);
+            }
+            break;
 
-            case VG_LITE_BGRA4444: {
-                    conv_bgra4444_to_bgra8888.convert(&target, source);
-                }
-                break;
+        case VG_LITE_BGRA4444: {
+                conv_bgra4444_to_bgra8888.convert(&target, source);
+            }
+            break;
 
-            case VG_LITE_BGRA2222: {
-                    conv_bgra2222_to_bgra8888.convert(&target, source);
-                }
-                break;
+        case VG_LITE_BGRA2222: {
+                conv_bgra2222_to_bgra8888.convert(&target, source);
+            }
+            break;
 
 #if LV_VG_LITE_THORVG_YUV_SUPPORT
-            case VG_LITE_NV12: {
-                    libyuv::NV12ToARGB((const uint8_t *)source->memory, source->stride, (const uint8_t *)source->yuv.uv_memory,
-                                       source->yuv.uv_stride,
-                                       (uint8_t *)image_buffer, source->width * sizeof(vg_lite_uint32_t), width, height);
-                }
-                break;
+        case VG_LITE_NV12: {
+                libyuv::NV12ToARGB((const uint8_t *)source->memory, source->stride, (const uint8_t *)source->yuv.uv_memory,
+                                   source->yuv.uv_stride,
+                                   (uint8_t *)image_buffer, source->width * sizeof(vg_lite_uint32_t), width, height);
+            }
+            break;
 #endif
 
-            case VG_LITE_BGRA8888: {
-                    memcpy(image_buffer, source->memory, px_size * sizeof(vg_color32_t));
-                }
-                break;
-
-            default:
-                LV_LOG_ERROR("unsupported format: %d", source->format);
-                LV_ASSERT(false);
-                break;
-        }
-
-        /* multiply color */
-        if(source->image_mode == VG_LITE_MULTIPLY_IMAGE_MODE && !VG_LITE_IS_ALPHA_FORMAT(source->format)) {
-            vg_color32_t * dest = (vg_color32_t *)image_buffer;
-            while(px_size--) {
-                dest->alpha = UDIV255(dest->alpha * A(color));
-                dest->red = UDIV255(dest->red * B(color));
-                dest->green = UDIV255(dest->green * G(color));
-                dest->blue = UDIV255(dest->blue * R(color));
-                dest++;
+        case VG_LITE_BGRA8888: {
+                memcpy(image_buffer, source->memory, px_size * sizeof(vg_color32_t));
             }
+            break;
+
+        default:
+            LV_LOG_ERROR("unsupported format: %d", source->format);
+            LV_ASSERT(false);
+            break;
+    }
+
+    /* multiply color */
+    if(source->image_mode == VG_LITE_MULTIPLY_IMAGE_MODE && !VG_LITE_IS_ALPHA_FORMAT(source->format)) {
+        vg_color32_t * dest = (vg_color32_t *)image_buffer;
+        while(px_size--) {
+            dest->alpha = UDIV255(dest->alpha * A(color));
+            dest->red = UDIV255(dest->red * B(color));
+            dest->green = UDIV255(dest->green * G(color));
+            dest->blue = UDIV255(dest->blue * R(color));
+            dest++;
         }
+    }
+
+    if(filter == VG_LITE_FILTER_GAUSSIAN) {
+        apply_gaussian_blur_filter((vg_color32_t *)target.memory, target.width, target.height, target.stride,
+                                   ctx->gaussian_blur.w0, ctx->gaussian_blur.w1, ctx->gaussian_blur.w2);
     }
 
     TVG_CHECK_RETURN_RESULT(picture->load((uint32_t *)image_buffer, source->width, source->height, true));
