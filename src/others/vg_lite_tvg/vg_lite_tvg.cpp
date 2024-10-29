@@ -2609,10 +2609,77 @@ static bool decode_indexed_line(
     return true;
 }
 
+static vg_color32_t blend_colors(const vg_color32_t & color1, const vg_color32_t & color2, float ratio)
+{
+    vg_color32_t result;
+    /* Calculate blended color for each channel (red, green, blue, alpha) */
+    result.red = static_cast<uint8_t>(color1.red * (1 - ratio) + color2.red * ratio);
+    result.green = static_cast<uint8_t>(color1.green * (1 - ratio) + color2.green * ratio);
+    result.blue = static_cast<uint8_t>(color1.blue * (1 - ratio) + color2.blue * ratio);
+    result.alpha = static_cast<uint8_t>(color1.alpha * (1 - ratio) + color2.alpha * ratio);
+    return result;
+}
+
 static void apply_gaussian_blur_filter(vg_color32_t * dst,
                                        vg_lite_uint32_t w, vg_lite_uint32_t h, vg_lite_uint32_t stride,
                                        vg_lite_float_t w0, vg_lite_float_t w1, vg_lite_float_t w2)
 {
+    /* Setup 3x3 gaussian blur weight values to filter image pixels.
+    *
+    *  Parameters w0, w1, w2 define a 3x3 gaussian blur weight matrix as below
+    *
+    *                  |  w2   w1   w2 |
+    *                  |  w1   w0   w1 |
+    *                  |  w2   w1   w2 |
+    *
+    *  The sum of 9 kernel weights must be 1.0 to avoid convolution overflow ( w0 + 4*w1 + 4*w2 = 1.0 ).
+    *  The 3x3 weight matrix applies to a 3x3 pixel block
+    *
+    *                  | pixel[i-1][j-1]     pixel[i][j-1]       pixel[i+1][j-1]|
+    *                  | pixel[i-1][j]       pixel[i][j]         pixel[i+1][j]  |
+    *                  | pixel[i-1][j+1]     pixel[i][j+1]       pixel[i+1][j+1]|
+    *
+    *  With the following dot product equation:
+    *
+    *     color[i][j] = w2*pixel[i-1][j-1] + w1*pixel[i][j-1] + w2*pixel[i+1][j-1]
+    *                 + w1*pixel[i-1][j]   + w0*pixel[i][j]   + w1*pixel[i+1][j]
+    *                 + w2*pixel[i-1][j+1] + w1*pixel[i][j+1] + w2*pixel[i+1][j+1];
+    */
+
+    /* Create a temporary buffer to store blurred colors */
+    auto temp_dst = new uint8_t[h * stride];
+
+    /* Loop through each pixel in the image */
+    for(vg_lite_uint32_t j = 1; j < h - 1; ++j) {
+        for(vg_lite_uint32_t i = 1; i < w - 1; ++i) {
+            /* Initialize an empty color for accumulating pixel values */
+            vg_color32_t color = {0, 0, 0, 0}; /* Initialize to black with no transparency */
+
+            /* Blend surrounding pixels based on Gaussian weights */
+            color = blend_colors(color, dst[(j - 1) * stride + (i - 1)], w2);
+            color = blend_colors(color, dst[(j - 1) * stride + i], w1);
+            color = blend_colors(color, dst[(j - 1) * stride + (i + 1)], w2);
+            color = blend_colors(color, dst[j * stride + (i - 1)], w1);
+            color = blend_colors(color, dst[j * stride + i], w0);
+            color = blend_colors(color, dst[j * stride + (i + 1)], w1);
+            color = blend_colors(color, dst[(j + 1) * stride + (i - 1)], w2);
+            color = blend_colors(color, dst[(j + 1) * stride + i], w1);
+            color = blend_colors(color, dst[(j + 1) * stride + (i + 1)], w2);
+
+            /* Store the calculated color value in the temporary buffer */
+            temp_dst[j * stride + i] = color;
+        }
+    }
+
+    /* Copy the blurred results back to the original destination */
+    for(vg_lite_uint32_t j = 0; j < h; ++j) {
+        for(vg_lite_uint32_t i = 0; i < w; ++i) {
+            dst[j * stride + i] = temp_dst[j * stride + i];
+        }
+    }
+
+    /* Clean up the temporary buffer to prevent memory leaks */
+    delete[] temp_dst;
 }
 
 static Result picture_load(vg_lite_ctx * ctx, std::unique_ptr<Picture> & picture, const vg_lite_buffer_t * source,
