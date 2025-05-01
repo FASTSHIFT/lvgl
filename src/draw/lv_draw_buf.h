@@ -352,6 +352,8 @@ void lv_image_buf_set_palette(lv_image_dsc_t * dsc, uint8_t id, lv_color32_t c);
  */
 void lv_image_buf_free(lv_image_dsc_t * dsc);
 
+void lv_draw_buf_exp_blur(lv_draw_buf_t * draw_buf, uint16_t radius);
+
 /**********************
  *      MACROS
  **********************/

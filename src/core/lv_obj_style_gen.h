@@ -151,6 +151,12 @@ static inline int32_t lv_obj_get_style_transform_skew_y(const lv_obj_t * obj, lv
     return (int32_t)v.num;
 }
 
+static inline int32_t lv_obj_get_style_transform_blur_radius(const lv_obj_t * obj, lv_part_t part)
+{
+    lv_style_value_t v = lv_obj_get_style_prop(obj, part, LV_STYLE_TRANSFORM_BLUR_RADIUS);
+    return (int32_t)v.num;
+}
+
 static inline int32_t lv_obj_get_style_pad_top(const lv_obj_t * obj, lv_part_t part)
 {
     lv_style_value_t v = lv_obj_get_style_prop(obj, part, LV_STYLE_PAD_TOP);
@@ -827,6 +833,7 @@ void lv_obj_set_style_transform_pivot_x(lv_obj_t * obj, int32_t value, lv_style_
 void lv_obj_set_style_transform_pivot_y(lv_obj_t * obj, int32_t value, lv_style_selector_t selector);
 void lv_obj_set_style_transform_skew_x(lv_obj_t * obj, int32_t value, lv_style_selector_t selector);
 void lv_obj_set_style_transform_skew_y(lv_obj_t * obj, int32_t value, lv_style_selector_t selector);
+void lv_obj_set_style_transform_blur_radius(lv_obj_t * obj, int32_t value, lv_style_selector_t selector);
 void lv_obj_set_style_pad_top(lv_obj_t * obj, int32_t value, lv_style_selector_t selector);
 void lv_obj_set_style_pad_bottom(lv_obj_t * obj, int32_t value, lv_style_selector_t selector);
 void lv_obj_set_style_pad_left(lv_obj_t * obj, int32_t value, lv_style_selector_t selector);

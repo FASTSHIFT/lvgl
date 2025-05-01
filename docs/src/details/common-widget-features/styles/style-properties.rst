@@ -317,6 +317,20 @@ Skew Widget vertically. The value is interpreted in 0.1 degree units. E.g. 450 m
   <li style='display:inline-block; margin-right: 20px; margin-left: 0px'><strong>Ext. draw</strong> Yes</li>
   </ul>
 
+transform_blur_radius
+~~~~~~~~~~~~~~~~~~~~~
+
+Set the radius of the blur effect. The value is interpreted in pixel units.
+
+.. raw:: html
+
+  <ul>
+  <li style='display:inline-block; margin-right: 20px; margin-left: 0px'><strong>Default</strong> 0</li>
+  <li style='display:inline-block; margin-right: 20px; margin-left: 0px'><strong>Inherited</strong> No</li>
+  <li style='display:inline-block; margin-right: 20px; margin-left: 0px'><strong>Layout</strong> No</li>
+  <li style='display:inline-block; margin-right: 20px; margin-left: 0px'><strong>Ext. draw</strong> No</li>
+  </ul>
+
 Padding
 -------
 

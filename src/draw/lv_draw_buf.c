@@ -550,6 +550,151 @@ void lv_image_buf_free(lv_image_dsc_t * dsc)
     }
 }
 
+#include <math.h>
+
+static inline void exp_blur_inner(
+    uint8_t * pixel,
+    int32_t * zB,
+    int32_t * zG,
+    int32_t * zR,
+    int32_t * zA,
+    int32_t alpha,
+    int32_t aprec,
+    int32_t zprec)
+{
+    int32_t B = *pixel;
+    int32_t G = *(pixel + 1);
+    int32_t R = *(pixel + 2);
+    int32_t A = *(pixel + 3);
+
+    *zB += (alpha * ((B << zprec) - *zB)) >> aprec;
+    *zG += (alpha * ((G << zprec) - *zG)) >> aprec;
+    *zR += (alpha * ((R << zprec) - *zR)) >> aprec;
+    *zA += (alpha * ((A << zprec) - *zA)) >> aprec;
+
+    *pixel = *zB >> zprec;
+    *(pixel + 1) = *zG >> zprec;
+    *(pixel + 2) = *zR >> zprec;
+    *(pixel + 3) = *zA >> zprec;
+}
+
+static inline void exp_blur_row(
+    uint8_t * pixels,
+    int32_t width,
+    int32_t /* height */, // TODO: This seems very strange. Why is height not used as it is in _blurcol() ?
+    int32_t stride,
+    int32_t line,
+    int32_t alpha,
+    int32_t aprec,
+    int32_t zprec)
+{
+    uint8_t * scanline = &(pixels[line * stride]);
+    int32_t zB = *scanline << zprec;
+    int32_t zG = *(scanline + 1) << zprec;
+    int32_t zR = *(scanline + 2) << zprec;
+    int32_t zA = *(scanline + 3) << zprec;
+
+    for(int32_t index = 0; index < width; index++) {
+        exp_blur_inner(
+            &scanline[index * sizeof(uint32_t)],
+            &zB, &zG, &zR, &zA,
+            alpha, aprec, zprec);
+    }
+
+    for(int32_t index = width - 2; index >= 0; index--) {
+        exp_blur_inner(
+            &scanline[index * sizeof(uint32_t)],
+            &zB, &zG, &zR, &zA,
+            alpha, aprec, zprec);
+    }
+}
+
+static inline void exp_blur_col(
+    uint8_t * pixels,
+    int32_t /*width*/,
+    int32_t height,
+    int32_t stride,
+    int32_t x,
+    int32_t alpha,
+    int32_t aprec,
+    int32_t zprec)
+{
+    uint8_t * ptr = pixels + x * sizeof(uint32_t);
+    int32_t zB = *((uint8_t *)ptr) << zprec;
+    int32_t zG = *((uint8_t *)ptr + 1) << zprec;
+    int32_t zR = *((uint8_t *)ptr + 2) << zprec;
+    int32_t zA = *((uint8_t *)ptr + 3) << zprec;
+
+    for(int32_t index = 1; index < height; index++) {
+        exp_blur_inner(
+            &ptr[index * stride],
+            &zB, &zG, &zR, &zA,
+            alpha, aprec, zprec);
+    }
+
+    for(int32_t index = height - 2; index >= 0; index--) {
+        exp_blur_inner(
+            &ptr[index * stride],
+            &zB, &zG, &zR, &zA,
+            alpha, aprec, zprec);
+    }
+}
+
+//
+// pixels   image-data
+// width    image-width
+// height   image-height
+// channels image-channels
+//
+// in-place blur of image 'img' with kernel of approximate radius 'radius'
+//
+// blurs with two sided exponential impulse response
+//
+// aprec = precision of alpha parameter in fixed-point format 0.aprec
+//
+// zprec = precision of state parameters zR,zG,zB and zA in fp format 8.zprec
+//
+static void exp_blur(uint8_t * pixels,
+                     int32_t width,
+                     int32_t height,
+                     int32_t stride,
+                     int32_t radius,
+                     int32_t aprec,
+                     int32_t zprec)
+{
+    if(radius < 1)
+        return;
+
+    // calculate the alpha such that 90% of
+    // the kernel is within the radius.
+    // (Kernel extends to infinity)
+    const int32_t alpha = (int32_t)((1 << aprec) * (1.0f - expf(-2.3f / (radius + 1.f))));
+
+    for(int32_t row = 0; row < height; row++) {
+        exp_blur_row(pixels, width, height, stride, row, alpha, aprec, zprec);
+    }
+
+    for(int32_t col = 0; col < width; col++) {
+        exp_blur_col(pixels, width, height, stride, col, alpha, aprec, zprec);
+    }
+}
+
+void lv_draw_buf_exp_blur(lv_draw_buf_t * draw_buf, uint16_t radius)
+{
+    if(draw_buf->header.cf != LV_COLOR_FORMAT_ARGB8888 && draw_buf->header.cf != LV_COLOR_FORMAT_XRGB8888) {
+        LV_LOG_WARN("Unsupported color format: %d", draw_buf->header.cf);
+        return;
+    }
+
+    exp_blur(
+        draw_buf->data,
+        draw_buf->header.w,
+        draw_buf->header.h,
+        draw_buf->header.stride,
+        radius,
+        16, 7);
+}
+
 /**********************
  *   STATIC FUNCTIONS
  **********************/

@@ -54,6 +54,8 @@ struct _lv_draw_image_dsc_t {
     /**Same as `skew_x` but vertically*/
     int32_t skew_y;
 
+    int32_t blur_radius;
+
     /**The pivot point of transformation (scale and rotation).
      * 0;0 is the top left corner of the image. Can be outside of the image too.*/
     lv_point_t pivot;

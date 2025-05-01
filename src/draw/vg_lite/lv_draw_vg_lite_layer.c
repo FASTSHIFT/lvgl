@@ -56,6 +56,10 @@ void lv_draw_vg_lite_layer(lv_draw_task_t * t, const lv_draw_image_dsc_t * draw_
         LV_LOG_WARN("Non-premultiplied layer buffer for GPU to draw.");
     }
 
+    if(draw_dsc->blur_radius > 0) {
+        lv_draw_buf_exp_blur(layer->draw_buf, draw_dsc->blur_radius);
+    }
+
     lv_draw_image_dsc_t new_draw_dsc = *draw_dsc;
     new_draw_dsc.src = layer->draw_buf;
     lv_draw_vg_lite_img(t, &new_draw_dsc, coords, true);
@@ -63,6 +67,7 @@ void lv_draw_vg_lite_layer(lv_draw_task_t * t, const lv_draw_image_dsc_t * draw_
     /* Wait for the GPU drawing to complete here,
      * otherwise it may cause the drawing to fail. */
     lv_vg_lite_finish(u);
+
 
     LV_PROFILER_DRAW_END;
 }
