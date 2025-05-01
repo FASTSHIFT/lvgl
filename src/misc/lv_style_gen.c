@@ -186,6 +186,14 @@ void lv_style_set_transform_skew_y(lv_style_t * style, int32_t value)
     lv_style_set_prop(style, LV_STYLE_TRANSFORM_SKEW_Y, v);
 }
 
+void lv_style_set_transform_blur_radius(lv_style_t * style, int32_t value)
+{
+    lv_style_value_t v = {
+        .num = (int32_t)value
+    };
+    lv_style_set_prop(style, LV_STYLE_TRANSFORM_BLUR_RADIUS, v);
+}
+
 void lv_style_set_pad_top(lv_style_t * style, int32_t value)
 {
     lv_style_value_t v = {

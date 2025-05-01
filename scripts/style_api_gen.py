@@ -94,6 +94,10 @@ props = [
   'style_type': 'num',   'var_type': 'int32_t',  'default':0, 'inherited': 0, 'layout': 1, 'ext_draw': 1,
   'dsc': "Skew Widget vertically. The value is interpreted in 0.1 degree units. E.g. 450 means 45 deg."},
 
+{'name': 'TRANSFORM_BLUR_RADIUS',
+  'style_type': 'num',   'var_type': 'int32_t',  'default':0, 'inherited': 0, 'layout': 0, 'ext_draw': 0,
+  'dsc': "Set the radius of the blur effect. The value is interpreted in pixel units."},
+
 {'section': 'Padding', 'dsc' : "Properties to describe spacing between the parent's sides and the children and among the children. Very similar to the padding properties in HTML."},
 {'name': 'PAD_TOP',
  'style_type': 'num',   'var_type': 'int32_t',  'default':0, 'inherited': 0, 'layout': 1, 'ext_draw': 0,
@@ -747,7 +751,7 @@ print('''\
 ''')
 print('#endif /* LV_STYLE_GEN_H */')
 
-sys.stdout = open(base_dir + '/../docs/details/base-widget/styles/style-properties.rst', 'w')
+sys.stdout = open(base_dir + '/../docs/src/details/common-widget-features/styles/style-properties.rst', 'w')
 
 print('.. _style_properties:')
 print()
