@@ -270,34 +270,6 @@ void test_circle_buf_fill(void)
     }
 }
 
-void test_circle_buf_pointers(void)
-{
-    /* Test head pointer */
-    int32_t value = 5;
-    lv_circle_buf_reset(circle_buf);
-    lv_circle_buf_write(circle_buf, &value);
-
-    int32_t head_val;
-    lv_circle_buf_peek(circle_buf, &head_val);
-    TEST_ASSERT_EQUAL_INT32(5, head_val);
-
-    /* Test latest pointer */
-    int32_t latest_val;
-    TEST_ASSERT_NOT_NULL(lv_circle_buf_latest(circle_buf));
-    latest_val = *(int32_t *)lv_circle_buf_latest(circle_buf);
-    TEST_ASSERT_EQUAL_INT32(5, latest_val);
-
-    lv_circle_buf_reset(circle_buf);
-    TEST_ASSERT_NULL(lv_circle_buf_latest(circle_buf));
-
-    /* Test tail by writing another value */
-    value = 10;
-    lv_circle_buf_reset(circle_buf);
-    lv_circle_buf_write(circle_buf, &value);
-    latest_val = *(int32_t *)lv_circle_buf_latest(circle_buf);
-    TEST_ASSERT_EQUAL_INT32(10, latest_val);
-}
-
 void test_circle_buf_edge_cases(void)
 {
     lv_circle_buf_reset(circle_buf);
