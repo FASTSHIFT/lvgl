@@ -17,7 +17,7 @@ void tearDown(void)
 /* Test lv_palette_main with all palette colors */
 void test_palette_main_all_colors(void)
 {
-    for(lv_palette_t p = LV_PALETTE_RED; p < _LV_PALETTE_LAST; p++) {
+    for(lv_palette_t p = LV_PALETTE_RED; p < LV_PALETTE_LAST; p++) {
         lv_color_t color = lv_palette_main(p);
         TEST_ASSERT_FALSE(lv_color_eq(lv_color_black(), color));
     }
@@ -26,7 +26,7 @@ void test_palette_main_all_colors(void)
 /* Test lv_palette_main with invalid palette */
 void test_palette_main_invalid(void)
 {
-    lv_color_t color = lv_palette_main(_LV_PALETTE_LAST);
+    lv_color_t color = lv_palette_main(LV_PALETTE_LAST);
     TEST_ASSERT_EQUAL_COLOR(lv_color_black(), color);
 
     color = lv_palette_main(LV_PALETTE_NONE);
@@ -36,7 +36,7 @@ void test_palette_main_invalid(void)
 /* Test lv_palette_lighten with all levels */
 void test_palette_lighten_all_levels(void)
 {
-    for(lv_palette_t p = LV_PALETTE_RED; p < _LV_PALETTE_LAST; p++) {
+    for(lv_palette_t p = LV_PALETTE_RED; p < LV_PALETTE_LAST; p++) {
         for(uint8_t lvl = 1; lvl <= 5; lvl++) {
             lv_color_t color = lv_palette_lighten(p, lvl);
             TEST_ASSERT_FALSE(lv_color_eq(lv_color_black(), color));
@@ -57,7 +57,7 @@ void test_palette_lighten_invalid(void)
 /* Test lv_palette_darken with all levels */
 void test_palette_darken_all_levels(void)
 {
-    for(lv_palette_t p = LV_PALETTE_RED; p < _LV_PALETTE_LAST; p++) {
+    for(lv_palette_t p = LV_PALETTE_RED; p < LV_PALETTE_LAST; p++) {
         for(uint8_t lvl = 1; lvl <= 4; lvl++) {
             lv_color_t color = lv_palette_darken(p, lvl);
             TEST_ASSERT_FALSE(lv_color_eq(lv_color_black(), color));
@@ -90,21 +90,21 @@ void test_palette_specific_values(void)
 /* Test lv_palette_main with out-of-range palette index */
 void test_palette_main_out_of_range(void)
 {
-    lv_color_t color = lv_palette_main(_LV_PALETTE_LAST + 1);
+    lv_color_t color = lv_palette_main(LV_PALETTE_LAST + 1);
     TEST_ASSERT_EQUAL_COLOR(lv_color_black(), color);
 }
 
 /* Test lv_palette_lighten with out-of-range palette index */
 void test_palette_lighten_out_of_range(void)
 {
-    lv_color_t color = lv_palette_lighten(_LV_PALETTE_LAST + 1, 1);
+    lv_color_t color = lv_palette_lighten(LV_PALETTE_LAST + 1, 1);
     TEST_ASSERT_EQUAL_COLOR(lv_color_black(), color);
 }
 
 /* Test lv_palette_darken with out-of-range palette index */
 void test_palette_darken_out_of_range(void)
 {
-    lv_color_t color = lv_palette_darken(_LV_PALETTE_LAST + 1, 1);
+    lv_color_t color = lv_palette_darken(LV_PALETTE_LAST + 1, 1);
     TEST_ASSERT_EQUAL_COLOR(lv_color_black(), color);
 }
 
