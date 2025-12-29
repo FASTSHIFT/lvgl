@@ -164,6 +164,15 @@ void lv_draw_sw_transform(const lv_area_t * dest_area, const void * src_buf,
 void lv_draw_sw_vector(lv_draw_task_t * t, lv_draw_vector_dsc_t * dsc);
 #endif
 
+#if LV_USE_VECTOR_GRAPHIC && LV_USE_PLUTOVG
+/**
+ * Draw vector graphics with SW render using PlutoVG.
+ * @param t             pointer to a draw task
+ * @param dsc           the draw descriptor
+ */
+void lv_draw_sw_vector(lv_draw_task_t * t, lv_draw_vector_dsc_t * dsc);
+#endif
+
 /**
  * Register a custom blend handler for a color format.
  * Handler will be called when blending a color or an

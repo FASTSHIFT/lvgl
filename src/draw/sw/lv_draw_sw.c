@@ -421,7 +421,7 @@ static void execute_drawing(lv_draw_task_t * t)
         case LV_DRAW_TASK_TYPE_MASK_RECTANGLE:
             lv_draw_sw_mask_rect(t, t->draw_dsc);
             break;
-#if LV_USE_VECTOR_GRAPHIC && LV_USE_THORVG
+#if LV_USE_VECTOR_GRAPHIC && (LV_USE_THORVG || LV_USE_PLUTOVG)
         case LV_DRAW_TASK_TYPE_VECTOR:
             lv_draw_sw_vector(t, t->draw_dsc);
             break;

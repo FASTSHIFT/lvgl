@@ -1019,6 +1019,9 @@
  *  Requires LV_USE_VECTOR_GRAPHIC */
 #define LV_USE_THORVG_EXTERNAL 0
 
+/** Enable PlutoVG (vector graphics library) from the src/libs folder */
+#define LV_USE_PLUTOVG         0
+
 /** Use lvgl built-in LZ4 lib */
 #define LV_USE_LZ4_INTERNAL  0
 

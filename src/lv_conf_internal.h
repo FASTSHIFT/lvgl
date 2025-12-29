@@ -3238,6 +3238,15 @@
     #endif
 #endif
 
+/** Enable PlutoVG (vector graphics library) from the src/libs folder */
+#ifndef LV_USE_PLUTOVG
+    #ifdef CONFIG_LV_USE_PLUTOVG
+        #define LV_USE_PLUTOVG CONFIG_LV_USE_PLUTOVG
+    #else
+        #define LV_USE_PLUTOVG         0
+    #endif
+#endif
+
 /** Use lvgl built-in LZ4 lib */
 #ifndef LV_USE_LZ4_INTERNAL
     #ifdef CONFIG_LV_USE_LZ4_INTERNAL
