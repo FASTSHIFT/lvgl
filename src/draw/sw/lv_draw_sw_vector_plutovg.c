@@ -291,7 +291,8 @@ static void _set_paint_fill_pattern(plutovg_canvas_t * canvas, const lv_draw_ima
 
     plutovg_matrix_t pm;
     lv_matrix_to_plutovg(&pm, m);
-    plutovg_canvas_set_texture(canvas, surface, PLUTOVG_TEXTURE_TYPE_PLAIN, LV_OPA_MIX2(p->opa, opa) / 255.0f, &pm);
+    float opacity = LV_OPA_MIX2(p->opa, opa) / 255.0f;
+    plutovg_canvas_set_texture(canvas, surface, PLUTOVG_TEXTURE_TYPE_PLAIN, opacity, &pm);
 
     plutovg_surface_destroy(surface);
     lv_image_decoder_close(&decoder_dsc);
@@ -308,8 +309,18 @@ static void _set_paint_fill(plutovg_canvas_t * canvas, const lv_vector_fill_dsc_
         plutovg_canvas_set_color(canvas, &c);
     }
     else if(dsc->style == LV_VECTOR_DRAW_STYLE_PATTERN) {
+        /* Pattern fill needs special handling - use path as clip */
         lv_matrix_t imx = *matrix;
+
+        if(dsc->fill_units == LV_VECTOR_FILL_UNITS_OBJECT_BOUNDING_BOX) {
+            /* Get path bounds for object bounding box mode */
+            plutovg_rect_t bounds;
+            plutovg_canvas_fill_extents(canvas, &bounds);
+            lv_matrix_translate(&imx, bounds.x, bounds.y);
+        }
+
         lv_matrix_multiply(&imx, &dsc->matrix);
+
         _set_paint_fill_pattern(canvas, &dsc->img_dsc, &imx, opa);
     }
     else if(dsc->style == LV_VECTOR_DRAW_STYLE_GRADIENT) {
@@ -357,6 +368,7 @@ static void _blend_draw_buf(lv_draw_buf_t * draw_buf, const lv_area_t * dst_area
 
 static void _task_draw_cb(void * ctx, const lv_vector_path_t * path, const lv_vector_path_ctx_t * dsc)
 {
+    LV_PROFILER_BEGIN_TAG("plutovg_vector_draw");
     _plutovg_draw_state * state = (_plutovg_draw_state *)ctx;
     plutovg_canvas_t * canvas = state->canvas;
 
@@ -413,6 +425,7 @@ static void _task_draw_cb(void * ctx, const lv_vector_path_t * path, const lv_ve
     }
 
     plutovg_canvas_restore(canvas);
+    LV_PROFILER_END_TAG("plutovg_vector_draw");
 }
 
 /**********************
