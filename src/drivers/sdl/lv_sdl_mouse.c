@@ -35,6 +35,7 @@ typedef struct {
     int16_t last_x;
     int16_t last_y;
     bool left_button_down;
+    uint32_t last_event_timestamp; /**< SDL event timestamp for prediction */
 #if LV_SDL_MOUSEWHEEL_MODE == LV_SDL_MOUSEWHEEL_MODE_CROWN
     int32_t diff;
 #endif
@@ -79,6 +80,12 @@ static void sdl_mouse_read(lv_indev_t * indev, lv_indev_data_t * data)
     data->point.x = dsc->last_x;
     data->point.y = dsc->last_y;
     data->state = dsc->left_button_down ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
+
+    /* Use SDL event timestamp for more accurate prediction timing */
+    if(dsc->last_event_timestamp > 0) {
+        data->timestamp = dsc->last_event_timestamp;
+    }
+
 #if LV_SDL_MOUSEWHEEL_MODE == LV_SDL_MOUSEWHEEL_MODE_CROWN
     data->enc_diff = dsc->diff;
     dsc->diff = 0;
@@ -153,10 +160,12 @@ void lv_sdl_mouse_handler(SDL_Event * event)
             if(event->window.event == SDL_WINDOWEVENT_LEAVE) {
                 indev_dev->left_button_down = false;
             }
+            indev_dev->last_event_timestamp = event->window.timestamp;
             break;
         case SDL_MOUSEBUTTONUP:
             if(event->button.button == SDL_BUTTON_LEFT)
                 indev_dev->left_button_down = false;
+            indev_dev->last_event_timestamp = event->button.timestamp;
             break;
         case SDL_WINDOWEVENT_LEAVE:
             indev_dev->left_button_down = false;
@@ -167,25 +176,30 @@ void lv_sdl_mouse_handler(SDL_Event * event)
                 indev_dev->last_x = (int16_t)((float)(event->motion.x) / zoom);
                 indev_dev->last_y = (int16_t)((float)(event->motion.y) / zoom);
             }
+            indev_dev->last_event_timestamp = event->button.timestamp;
             break;
         case SDL_MOUSEMOTION:
             indev_dev->last_x = (int16_t)((float)(event->motion.x) / zoom);
             indev_dev->last_y = (int16_t)((float)(event->motion.y) / zoom);
+            indev_dev->last_event_timestamp = event->motion.timestamp;
             break;
 
         case SDL_FINGERUP:
             indev_dev->left_button_down = false;
             indev_dev->last_x = (int16_t)((float)hor_res * event->tfinger.x / zoom);
             indev_dev->last_y = (int16_t)((float)ver_res * event->tfinger.y / zoom);
+            indev_dev->last_event_timestamp = event->tfinger.timestamp;
             break;
         case SDL_FINGERDOWN:
             indev_dev->left_button_down = true;
             indev_dev->last_x = (int16_t)((float)hor_res * event->tfinger.x / zoom);
             indev_dev->last_y = (int16_t)((float)ver_res * event->tfinger.y / zoom);
+            indev_dev->last_event_timestamp = event->tfinger.timestamp;
             break;
         case SDL_FINGERMOTION:
             indev_dev->last_x = (int16_t)((float)hor_res * event->tfinger.x / zoom);
             indev_dev->last_y = (int16_t)((float)ver_res * event->tfinger.y / zoom);
+            indev_dev->last_event_timestamp = event->tfinger.timestamp;
             break;
         case SDL_MOUSEWHEEL:
 #if LV_SDL_MOUSEWHEEL_MODE == LV_SDL_MOUSEWHEEL_MODE_CROWN
@@ -197,6 +211,7 @@ void lv_sdl_mouse_handler(SDL_Event * event)
             indev_dev->diff = -event->wheel.y;
 #endif  /*__EMSCRIPTEN__*/
 #endif /*LV_SDL_MOUSEWHEEL_MODE == LV_SDL_MOUSEWHEEL_MODE_CROWN*/
+            indev_dev->last_event_timestamp = event->wheel.timestamp;
             break;
     }
     lv_indev_read(indev);

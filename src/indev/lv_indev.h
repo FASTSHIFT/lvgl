@@ -452,6 +452,57 @@ lv_result_t lv_indev_send_event(lv_indev_t * indev, lv_event_code_t code, void *
  */
 void lv_indev_set_key_remap_cb(lv_indev_t * indev, lv_indev_key_remap_cb_t remap_cb);
 
+/**
+ * Enable or disable coordinate prediction for pointer input devices
+ * Prediction uses timestamp-based velocity tracking to predict
+ * the next touch position, reducing perceived input latency.
+ * @param indev pointer to an input device (must be LV_INDEV_TYPE_POINTER)
+ * @param en true to enable prediction, false to disable
+ */
+void lv_indev_set_prediction_enabled(lv_indev_t * indev, bool en);
+
+/**
+ * Check if coordinate prediction is enabled for the input device
+ * @param indev pointer to an input device
+ * @return true if prediction is enabled, false otherwise
+ */
+bool lv_indev_get_prediction_enabled(const lv_indev_t * indev);
+
+/**
+ * Set the prediction look-ahead time
+ * Higher values provide more aggressive prediction (lower latency)
+ * but may cause overshooting during direction changes.
+ * @param indev pointer to an input device
+ * @param time_ms prediction time in milliseconds (default: 8ms)
+ */
+void lv_indev_set_prediction_time(lv_indev_t * indev, int32_t time_ms);
+
+/**
+ * Get the current prediction look-ahead time
+ * @param indev pointer to an input device
+ * @return prediction time in milliseconds
+ */
+int32_t lv_indev_get_prediction_time(const lv_indev_t * indev);
+
+/**
+ * Set the maximum prediction distance
+ * Limits how far ahead the prediction can extrapolate
+ * to prevent overshooting during sudden stops or direction changes.
+ * @param indev pointer to an input device
+ * @param max_dist maximum prediction distance in pixels (default: 50px)
+ */
+void lv_indev_set_prediction_max_distance(lv_indev_t * indev, int32_t max_dist);
+
+/**
+ * Get the predicted point for the input device
+ * This returns the predicted position based on current velocity
+ * and the configured prediction time.
+ * @param indev pointer to an input device
+ * @param point output: the predicted point
+ * @return true if prediction was made, false if not enough data
+ */
+bool lv_indev_get_predicted_point(lv_indev_t * indev, lv_point_t * point);
+
 #if LV_USE_EXT_DATA
 /**
  * @brief Attaches external user data and destructor callback to an indev

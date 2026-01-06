@@ -1,4 +1,5 @@
 #include "lv_indev_private.h"
+#include "lv_indev_predict.h"
 #include "../misc/lv_event_private.h"
 #include "../misc/lv_area_private.h"
 #include "../misc/lv_anim_private.h"
@@ -146,6 +147,9 @@ lv_indev_t * lv_indev_create(void)
     indev->ext_data.free_cb = NULL;
     indev->ext_data.data = NULL;
 #endif
+
+    /* Initialize coordinate prediction */
+    lv_indev_predict_init(&indev->predict);
 
 #if LV_USE_GESTURE_RECOGNITION
     lv_indev_gesture_init(indev);
@@ -697,6 +701,52 @@ void lv_indev_set_key_remap_cb(lv_indev_t * indev, lv_indev_key_remap_cb_t remap
     indev->key_remap_cb = remap_cb;
 }
 
+void lv_indev_set_prediction_enabled(lv_indev_t * indev, bool en)
+{
+    if(!indev) {
+        LV_LOG_WARN("Can't set prediction on NULL indev");
+        return;
+    }
+    lv_indev_predict_enable(&indev->predict, en);
+}
+
+bool lv_indev_get_prediction_enabled(const lv_indev_t * indev)
+{
+    if(!indev) return false;
+    return indev->predict.enabled;
+}
+
+void lv_indev_set_prediction_time(lv_indev_t * indev, int32_t time_ms)
+{
+    if(!indev) {
+        LV_LOG_WARN("Can't set prediction time on NULL indev");
+        return;
+    }
+    lv_indev_predict_set_time(&indev->predict, time_ms);
+}
+
+int32_t lv_indev_get_prediction_time(const lv_indev_t * indev)
+{
+    if(!indev) return 0;
+    return indev->predict.predict_time_ms;
+}
+
+void lv_indev_set_prediction_max_distance(lv_indev_t * indev, int32_t max_dist)
+{
+    if(!indev) {
+        LV_LOG_WARN("Can't set prediction max distance on NULL indev");
+        return;
+    }
+    lv_indev_predict_set_max_distance(&indev->predict, max_dist);
+}
+
+bool lv_indev_get_predicted_point(lv_indev_t * indev, lv_point_t * point)
+{
+    if(!indev || !point) return false;
+    uint32_t target_time = lv_tick_get() + indev->predict.predict_time_ms;
+    return lv_indev_predict_get_point(&indev->predict, target_time, point);
+}
+
 #if LV_USE_EXT_DATA
 void lv_indev_set_external_data(lv_indev_t * indev, void * data, void (* free_cb)(void * data))
 {
@@ -741,14 +791,40 @@ static void indev_pointer_proc(lv_indev_t * i, lv_indev_data_t * data)
         LV_LOG_WARN("Y is %d which is greater than ver. res", (int)data->point.y);
     }
 
-    /*Move the cursor if set and moved*/
-    if(i->cursor != NULL &&
-       (i->pointer.last_point.x != data->point.x || i->pointer.last_point.y != data->point.y)) {
-        lv_obj_set_pos(i->cursor, data->point.x, data->point.y);
+    /* Add point to prediction history if pressed */
+    if(data->state == LV_INDEV_STATE_PRESSED) {
+        lv_indev_predict_add_point(&i->predict, &data->point, data->timestamp);
+    }
+    else {
+        /* Reset prediction on release */
+        lv_indev_predict_reset(&i->predict);
     }
 
-    i->pointer.act_point.x = data->point.x;
-    i->pointer.act_point.y = data->point.y;
+    /* Apply coordinate prediction if enabled and pressed */
+    lv_point_t final_point = data->point;
+    if(i->predict.enabled && data->state == LV_INDEV_STATE_PRESSED) {
+        lv_point_t predicted;
+        uint32_t target_time = lv_tick_get() + i->predict.predict_time_ms;
+        if(lv_indev_predict_get_point(&i->predict, target_time, &predicted)) {
+            /* Clamp predicted point to display bounds */
+            int32_t hor_res = lv_display_get_horizontal_resolution(i->disp);
+            int32_t ver_res = lv_display_get_vertical_resolution(i->disp);
+            if(predicted.x < 0) predicted.x = 0;
+            if(predicted.x >= hor_res) predicted.x = hor_res - 1;
+            if(predicted.y < 0) predicted.y = 0;
+            if(predicted.y >= ver_res) predicted.y = ver_res - 1;
+            final_point = predicted;
+        }
+    }
+
+    /*Move the cursor if set and moved*/
+    if(i->cursor != NULL &&
+       (i->pointer.last_point.x != final_point.x || i->pointer.last_point.y != final_point.y)) {
+        lv_obj_set_pos(i->cursor, final_point.x, final_point.y);
+    }
+
+    i->pointer.act_point.x = final_point.x;
+    i->pointer.act_point.y = final_point.y;
     i->pointer.diff = data->enc_diff;
 
 #if LV_USE_GESTURE_RECOGNITION

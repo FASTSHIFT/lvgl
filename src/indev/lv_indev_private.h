@@ -17,6 +17,7 @@ extern "C" {
 #include "../misc/lv_anim.h"
 #include "lv_indev_scroll.h"
 #include "lv_indev_gesture.h"
+#include "lv_indev_predict.h"
 
 #if LV_USE_EXT_DATA
 #include "../lvgl_private.h"
@@ -138,6 +139,9 @@ struct _lv_indev_t {
     void * gesture_data[LV_INDEV_GESTURE_CNT];
     lv_indev_gesture_type_t gesture_type[LV_INDEV_GESTURE_CNT];
 #endif
+
+    /** Coordinate prediction context for improved responsiveness */
+    lv_indev_predict_t predict;
 };
 
 /**********************
