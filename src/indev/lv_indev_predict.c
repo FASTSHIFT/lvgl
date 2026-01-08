@@ -10,6 +10,7 @@
 #include "../tick/lv_tick.h"
 #include "../misc/lv_math.h"
 #include "../stdlib/lv_string.h"
+#include "../misc/lv_assert.h"
 #include "../misc/lv_log.h"
 
 /*********************
@@ -32,7 +33,6 @@
  *  STATIC PROTOTYPES
  **********************/
 static int32_t weighted_average_velocity(const lv_indev_predict_t * ctx, bool is_x);
-static int32_t clamp_value(int32_t value, int32_t min_val, int32_t max_val);
 
 /**********************
  *   GLOBAL FUNCTIONS
@@ -40,17 +40,16 @@ static int32_t clamp_value(int32_t value, int32_t min_val, int32_t max_val);
 
 void lv_indev_predict_init(lv_indev_predict_t * ctx)
 {
-    if(ctx == NULL) return;
+    LV_ASSERT_NULL(ctx);
 
     lv_memzero(ctx, sizeof(lv_indev_predict_t));
-    ctx->enabled = true;
     ctx->predict_time_ms = LV_INDEV_PREDICT_TIME_MS;
     ctx->max_distance = LV_INDEV_PREDICT_MAX_DIST;
 }
 
 void lv_indev_predict_reset(lv_indev_predict_t * ctx)
 {
-    if(ctx == NULL) return;
+    LV_ASSERT_NULL(ctx);
 
     ctx->hist_index = 0;
     ctx->hist_count = 0;
@@ -65,25 +64,26 @@ void lv_indev_predict_reset(lv_indev_predict_t * ctx)
 
 void lv_indev_predict_enable(lv_indev_predict_t * ctx, bool en)
 {
-    if(ctx == NULL) return;
+    LV_ASSERT_NULL(ctx);
     ctx->enabled = en;
 }
 
 void lv_indev_predict_set_time(lv_indev_predict_t * ctx, int32_t time_ms)
 {
-    if(ctx == NULL) return;
+    LV_ASSERT_NULL(ctx);
     ctx->predict_time_ms = time_ms;
 }
 
 void lv_indev_predict_set_max_distance(lv_indev_predict_t * ctx, int32_t max_dist)
 {
-    if(ctx == NULL) return;
+    LV_ASSERT_NULL(ctx);
     ctx->max_distance = max_dist;
 }
 
 void lv_indev_predict_add_point(lv_indev_predict_t * ctx, const lv_point_t * point, uint32_t timestamp)
 {
-    if(ctx == NULL || point == NULL) return;
+    LV_ASSERT_NULL(ctx);
+    LV_ASSERT_NULL(point);
 
     /* Store the new point in history */
     ctx->hist[ctx->hist_index].point = *point;
@@ -102,7 +102,10 @@ bool lv_indev_predict_get_point(lv_indev_predict_t * ctx, uint32_t target_time, 
 {
     LV_UNUSED(target_time);
 
-    if(ctx == NULL || predicted_point == NULL || !ctx->enabled) {
+    LV_ASSERT_NULL(ctx);
+    LV_ASSERT_NULL(predicted_point);
+
+    if(!ctx->enabled) {
         return false;
     }
 
@@ -119,8 +122,9 @@ bool lv_indev_predict_get_point(lv_indev_predict_t * ctx, uint32_t target_time, 
     int32_t dt_ms = ctx->predict_time_ms;
 
     /* Check if velocity is too low to predict (avoid jitter) */
-    int32_t speed_sq = (ctx->velocity.x * ctx->velocity.x + ctx->velocity.y * ctx->velocity.y) /
-                       (VELOCITY_SCALE * VELOCITY_SCALE);
+    int64_t vx = ctx->velocity.x;
+    int64_t vy = ctx->velocity.y;
+    int64_t speed_sq = (vx * vx + vy * vy) / ((int64_t)VELOCITY_SCALE * VELOCITY_SCALE);
     if(speed_sq < 100 * 100) {  /* Less than 100 pixels/second */
         *predicted_point = last_point->point;
         return true;
@@ -134,12 +138,17 @@ bool lv_indev_predict_get_point(lv_indev_predict_t * ctx, uint32_t target_time, 
     int32_t pred_y = (ctx->velocity.y * dt_ms) / (1000 * VELOCITY_SCALE);
 
     /* Clamp prediction distance */
-    pred_x = clamp_value(pred_x, -ctx->max_distance, ctx->max_distance);
-    pred_y = clamp_value(pred_y, -ctx->max_distance, ctx->max_distance);
+    pred_x = LV_CLAMP(-ctx->max_distance, pred_x, ctx->max_distance);
+    pred_y = LV_CLAMP(-ctx->max_distance, pred_y, ctx->max_distance);
 
     /* Calculate predicted point */
     predicted_point->x = last_point->point.x + pred_x;
     predicted_point->y = last_point->point.y + pred_y;
+
+    /* Log prediction offset */
+    if(pred_x != 0 || pred_y != 0) {
+        LV_LOG_TRACE("predict offset: (%" LV_PRId32 ", %" LV_PRId32 ")", pred_x, pred_y);
+    }
 
     /* Store for potential debugging/analysis */
     ctx->last_predicted = *predicted_point;
@@ -150,7 +159,9 @@ bool lv_indev_predict_get_point(lv_indev_predict_t * ctx, uint32_t target_time, 
 
 bool lv_indev_predict_calc_velocity(lv_indev_predict_t * ctx)
 {
-    if(ctx == NULL || ctx->hist_count < 2) {
+    LV_ASSERT_NULL(ctx);
+
+    if(ctx->hist_count < 2) {
         return false;
     }
 
@@ -171,7 +182,8 @@ bool lv_indev_predict_calc_velocity(lv_indev_predict_t * ctx)
 
 void lv_indev_predict_get_velocity(const lv_indev_predict_t * ctx, lv_point_t * velocity)
 {
-    if(ctx == NULL || velocity == NULL) return;
+    LV_ASSERT_NULL(ctx);
+    LV_ASSERT_NULL(velocity);
     *velocity = ctx->velocity;
 }
 
@@ -230,14 +242,4 @@ static int32_t weighted_average_velocity(const lv_indev_predict_t * ctx, bool is
     if(total_weight == 0) return 0;
 
     return (int32_t)(weighted_velocity / total_weight);
-}
-
-/**
- * Clamp a value to a range
- */
-static int32_t clamp_value(int32_t value, int32_t min_val, int32_t max_val)
-{
-    if(value < min_val) return min_val;
-    if(value > max_val) return max_val;
-    return value;
 }
