@@ -12,6 +12,7 @@
 #include "../stdlib/lv_string.h"
 #include "../misc/lv_assert.h"
 #include "../misc/lv_log.h"
+#include "../stdlib/lv_sprintf.h"
 
 /*********************
  *      DEFINES
@@ -28,6 +29,12 @@
 
 /** Maximum valid velocity (pixels per second) - filter out noise */
 #define MAX_VELOCITY        5000
+
+/** Error smoothing factor (0-256, higher = more smoothing) */
+#define ERROR_SMOOTH        224
+
+/** Maximum error samples to average */
+#define ERROR_MAX_SAMPLES   32
 
 /**********************
  *  STATIC PROTOTYPES
@@ -58,6 +65,10 @@ void lv_indev_predict_reset(lv_indev_predict_t * ctx)
     ctx->last_predicted.x = 0;
     ctx->last_predicted.y = 0;
     ctx->last_predict_time = 0;
+    ctx->error_sum = 0;
+    ctx->error_count = 0;
+    ctx->avg_error = 0;
+    ctx->has_pending_prediction = false;
 
     lv_memzero(ctx->hist, sizeof(ctx->hist));
 }
@@ -84,6 +95,33 @@ void lv_indev_predict_add_point(lv_indev_predict_t * ctx, const lv_point_t * poi
 {
     LV_ASSERT_NULL(ctx);
     LV_ASSERT_NULL(point);
+
+    /* Evaluate prediction accuracy if there's a pending prediction */
+    if(ctx->has_pending_prediction && ctx->enabled) {
+        /* Calculate error between predicted point and actual point */
+        int32_t err_x = point->x - ctx->last_predicted.x;
+        int32_t err_y = point->y - ctx->last_predicted.y;
+
+        /* Calculate error magnitude (using Manhattan distance for simplicity, scaled by 256) */
+        int32_t error = (LV_ABS(err_x) + LV_ABS(err_y)) * 256;
+
+        /* Update running average with exponential smoothing */
+        if(ctx->error_count == 0) {
+            ctx->avg_error = error;
+        }
+        else {
+            ctx->avg_error = (ctx->avg_error * ERROR_SMOOTH + error * (256 - ERROR_SMOOTH)) / 256;
+        }
+
+        if(ctx->error_count < ERROR_MAX_SAMPLES) {
+            ctx->error_count++;
+        }
+
+        ctx->has_pending_prediction = false;
+
+        LV_LOG_USER("predict error: %" LV_PRId32 " px, avg: %" LV_PRId32 ".%02" LV_PRId32 " px",
+                    error / 256, ctx->avg_error / 256, (ctx->avg_error % 256) * 100 / 256);
+    }
 
     /* Store the new point in history */
     ctx->hist[ctx->hist_index].point = *point;
@@ -153,6 +191,7 @@ bool lv_indev_predict_get_point(lv_indev_predict_t * ctx, uint32_t target_time, 
     /* Store for potential debugging/analysis */
     ctx->last_predicted = *predicted_point;
     ctx->last_predict_time = lv_tick_get();
+    ctx->has_pending_prediction = true;
 
     return true;
 }
@@ -185,6 +224,13 @@ void lv_indev_predict_get_velocity(const lv_indev_predict_t * ctx, lv_point_t * 
     LV_ASSERT_NULL(ctx);
     LV_ASSERT_NULL(velocity);
     *velocity = ctx->velocity;
+}
+
+int32_t lv_indev_predict_get_avg_error(const lv_indev_predict_t * ctx)
+{
+    LV_ASSERT_NULL(ctx);
+    if(ctx->error_count == 0) return 0;
+    return ctx->avg_error;
 }
 
 /**********************

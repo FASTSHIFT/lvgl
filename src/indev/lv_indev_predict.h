@@ -65,6 +65,12 @@ typedef struct {
     bool enabled;           /**< Enable/disable prediction */
     int32_t predict_time_ms; /**< Look-ahead time for prediction */
     int32_t max_distance;   /**< Maximum prediction distance */
+
+    /* Accuracy tracking for adaptive prediction */
+    int32_t error_sum;      /**< Sum of prediction errors (scaled by 256) */
+    int32_t error_count;    /**< Number of error samples */
+    int32_t avg_error;      /**< Average prediction error in pixels (scaled by 256) */
+    bool has_pending_prediction; /**< True if there's a prediction waiting to be evaluated */
 } lv_indev_predict_t;
 
 /**********************
@@ -134,6 +140,13 @@ bool lv_indev_predict_calc_velocity(lv_indev_predict_t * ctx);
  * @param velocity output: velocity in pixels per second (scaled by 256)
  */
 void lv_indev_predict_get_velocity(const lv_indev_predict_t * ctx, lv_point_t * velocity);
+
+/**
+ * Get the average prediction error
+ * @param ctx pointer to prediction context
+ * @return average error in pixels (scaled by 256), or 0 if no data
+ */
+int32_t lv_indev_predict_get_avg_error(const lv_indev_predict_t * ctx);
 
 #ifdef __cplusplus
 } /*extern "C"*/
