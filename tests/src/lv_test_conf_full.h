@@ -195,21 +195,6 @@
     #endif
 #endif
 
-/* NanoVG compile check: keep enabled for build-only configs (OPTIONS_FULL_32BIT)
- * to catch compile errors. Runtime testing is done via OPTIONS_TEST_NANOVG. */
-#ifndef LV_USE_NANOVG
-    #if !defined(NON_AMD64_BUILD) && !defined(_MSC_VER) && !defined(_WIN32)
-        #define LV_USE_NANOVG      1
-        #define LV_USE_DRAW_NANOVG 1
-    #else
-        #define LV_USE_NANOVG      0
-        #define LV_USE_DRAW_NANOVG 0
-    #endif
-#endif
-#ifndef LV_USE_DRAW_NANOVG
-    #define LV_USE_DRAW_NANOVG 0
-#endif
-
 #define LV_USE_FREETYPE 1
 #define LV_FREETYPE_USE_LVGL_PORT 0
 #define LV_FREETYPE_CACHE_FT_GLYPH_CNT 64
