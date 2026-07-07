@@ -5,6 +5,19 @@
 
 #include "unity/unity.h"
 
+/* NanoVG's GPU rasterization produces blur edges that differ between architectures
+ * beyond a usable tolerance, so it keeps a per-architecture reference set. The SW
+ * renderer is architecture-stable and shares a single reference image. */
+#if LV_USE_DRAW_NANOVG
+    #ifndef NON_AMD64_BUILD
+        #define REF_IMG_EXT ".nvg.lp64.png"
+    #else
+        #define REF_IMG_EXT ".nvg.lp32.png"
+    #endif
+#else
+    #define REF_IMG_EXT ".png"
+#endif
+
 void setUp(void)
 {
     /* Function run before every test */
@@ -114,14 +127,8 @@ void test_blur(void)
         small_canvas_render("argb8888", LV_COLOR_FORMAT_ARGB8888, canvas_buf[19], 60, radius_current);
 
         char buf[128];
-        lv_snprintf(buf, sizeof(buf), "draw/draw_blur_corner_%u.png", radius_current);
-        /* NanoVG reference images are committed for the 32-bit build; blur edges differ
-         * between architectures beyond a usable tolerance, so only compare on 32-bit. */
-#if LV_USE_DRAW_NANOVG && !defined(NON_AMD64_BUILD)
-        LV_UNUSED(buf);
-#else
+        lv_snprintf(buf, sizeof(buf), "draw/draw_blur_corner_%u" REF_IMG_EXT, radius_current);
         TEST_ASSERT_EQUAL_SCREENSHOT(buf);
-#endif
     }
 }
 
