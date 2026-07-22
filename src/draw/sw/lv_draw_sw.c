@@ -320,6 +320,7 @@ static int32_t dispatch(lv_draw_unit_t * draw_unit, lv_layer_t * layer)
 
     void * buf = lv_draw_layer_alloc_buf(layer);
     if(buf == NULL) {
+        t->state = LV_DRAW_TASK_STATE_FAILED;
         LV_PROFILER_DRAW_END;
         return LV_DRAW_UNIT_IDLE;  /*Couldn't start rendering*/
     }
