@@ -127,7 +127,7 @@ void test_draw_layer_alloc_failed_no_deadlock(void)
 
     /*Hook buf_malloc_cb to always fail*/
     lv_draw_buf_handlers_t * handlers = lv_draw_buf_get_handlers();
-    lv_draw_buf_malloc_cb original_malloc_cb = handlers->buf_malloc_cb;
+    lv_draw_buf_malloc_cb_t original_malloc_cb = handlers->buf_malloc_cb;
     handlers->buf_malloc_cb = fake_buf_malloc_fail;
 
     /*This must return without deadlock - the FAILED state allows the
