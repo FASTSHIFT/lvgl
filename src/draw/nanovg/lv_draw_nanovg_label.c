@@ -18,6 +18,10 @@
 #include "../../misc/cache/lv_cache_entry_private.h"
 #include "../../misc/lv_pending.h"
 #include "../../font/lv_font_private.h"
+#if LV_USE_FREETYPE && LV_USE_VECTOR_GRAPHIC
+    #include "../../font/freetype/lv_freetype_private.h"
+    #include "../lv_draw_vector_private.h"
+#endif
 
 /*********************
 *      DEFINES
@@ -49,6 +53,11 @@ static void letter_cache_release_cb(void * entry, void * user_data);
 static bool letter_create_cb(letter_item_t * item, void * user_data);
 static void letter_free_cb(letter_item_t * item, void * user_data);
 static lv_cache_compare_res_t letter_compare_cb(const letter_item_t * lhs, const letter_item_t * rhs);
+#if LV_USE_FREETYPE && LV_USE_VECTOR_GRAPHIC
+static void draw_letter_outline(lv_draw_unit_t * draw_unit, const lv_area_t * clip_area,
+                                const lv_draw_glyph_dsc_t * dsc);
+static void freetype_outline_event_cb(lv_event_t * e);
+#endif /* LV_USE_FREETYPE && LV_USE_VECTOR_GRAPHIC */
 
 /**********************
 *  STATIC VARIABLES
@@ -78,6 +87,11 @@ void lv_draw_nanovg_label_init(lv_draw_nanovg_unit_t * u)
     lv_cache_set_name(u->letter_cache, "NVG_LETTER");
     u->letter_pending = lv_pending_create(sizeof(lv_cache_entry_t *), 4);
     lv_pending_set_free_cb(u->letter_pending, letter_cache_release_cb, u->letter_cache);
+
+#if LV_USE_FREETYPE && LV_USE_VECTOR_GRAPHIC
+    /*Set up the freetype outline event, the glyphs of the outline fonts are lv_vector_path_t*/
+    lv_freetype_outline_add_event(freetype_outline_event_cb, LV_EVENT_ALL, u);
+#endif /* LV_USE_FREETYPE && LV_USE_VECTOR_GRAPHIC */
 }
 
 void lv_draw_nanovg_label_deinit(lv_draw_nanovg_unit_t * u)
@@ -292,6 +306,118 @@ static lv_cache_compare_res_t letter_compare_cb(const letter_item_t * lhs, const
 }
 
 
+#if LV_USE_FREETYPE && LV_USE_VECTOR_GRAPHIC
+
+/*Fill (and stroke) the outline of a glyph as a NanoVG path, so it can be scaled and rotated without a bitmap*/
+static void draw_letter_outline(lv_draw_unit_t * draw_unit, const lv_area_t * clip_area,
+                                const lv_draw_glyph_dsc_t * dsc)
+{
+    LV_PROFILER_DRAW_BEGIN;
+
+    lv_area_t letter_area;
+    lv_area_t clipped_area;
+    if(!draw_letter_clip_areas(clip_area, dsc, &letter_area, &clipped_area)) {
+        LV_PROFILER_DRAW_END;
+        return;
+    }
+
+    lv_draw_nanovg_unit_t * u = (lv_draw_nanovg_unit_t *)draw_unit;
+    const lv_vector_path_t * path = dsc->glyph_data;
+
+    /*The path is in pixels of the reference size of the font, with the Y axis up*/
+    const float scale = LV_FREETYPE_F26DOT6_TO_FLOAT(lv_freetype_outline_get_scale(dsc->g->resolved_font));
+    if(scale <= 0.0f) {
+        LV_PROFILER_DRAW_END;
+        return;
+    }
+
+    /*The origin of the glyph, on the baseline*/
+    const float x = dsc->letter_coords->x1 - dsc->g->ofs_x;
+    const float y = dsc->letter_coords->y1 + dsc->g->box_h + dsc->g->ofs_y;
+
+    nvgSave(u->vg);
+
+    /*The scissor is already set to the clip area of the task, it's not affected by the transforms below*/
+    nvgTranslate(u->vg, x + dsc->pivot.x, y);
+    /*The rotation is in 0.1 degree*/
+    if(dsc->rotation) nvgRotate(u->vg, nvgDegToRad(dsc->rotation / 10.0f));
+    nvgTranslate(u->vg, -dsc->pivot.x, 0);
+    nvgScale(u->vg, scale, -scale);
+
+    nvgBeginPath(u->vg);
+    lv_nanovg_path_append_vector_path(u->vg, path, true, NULL);
+
+    if(dsc->outline_stroke_width > 0 && dsc->outline_stroke_opa > LV_OPA_MIN) {
+        /*The width is in pixels, but the path is scaled*/
+        nvgStrokeWidth(u->vg, dsc->outline_stroke_width / scale);
+        nvgStrokeColor(u->vg, lv_nanovg_color_convert(dsc->outline_stroke_color, dsc->outline_stroke_opa));
+        nvgStroke(u->vg);
+    }
+
+    lv_nanovg_fill(u->vg, LV_NANOVG_WINDING_KEEP, NVG_SOURCE_OVER, lv_nanovg_color_convert(dsc->color, dsc->opa));
+
+    nvgRestore(u->vg);
+
+    LV_PROFILER_DRAW_END;
+}
+
+/* Build the vector path of a glyph from the outline events emitted by lv_freetype_outline.c.
+ * It's the same path as the one the software renderer makes. */
+static void freetype_outline_event_cb(lv_event_t * e)
+{
+    lv_freetype_outline_event_param_t * param = lv_event_get_param(e);
+
+    switch(lv_event_get_code(e)) {
+        case LV_EVENT_CREATE:
+            param->outline = lv_vector_path_create(LV_VECTOR_PATH_QUALITY_HIGH);
+            break;
+
+        case LV_EVENT_DELETE:
+            lv_vector_path_clear(param->outline);
+            lv_vector_path_delete(param->outline);
+            break;
+
+        case LV_EVENT_INSERT: {
+                lv_fpoint_t pnt;
+                lv_fpoint_t ctrl_pnt1;
+                lv_fpoint_t ctrl_pnt2;
+                lv_vector_path_t * path = param->outline;
+
+                pnt.x = LV_FREETYPE_F26DOT6_TO_FLOAT(param->to.x);
+                pnt.y = LV_FREETYPE_F26DOT6_TO_FLOAT(param->to.y);
+                ctrl_pnt1.x = LV_FREETYPE_F26DOT6_TO_FLOAT(param->control1.x);
+                ctrl_pnt1.y = LV_FREETYPE_F26DOT6_TO_FLOAT(param->control1.y);
+                ctrl_pnt2.x = LV_FREETYPE_F26DOT6_TO_FLOAT(param->control2.x);
+                ctrl_pnt2.y = LV_FREETYPE_F26DOT6_TO_FLOAT(param->control2.y);
+
+                switch(param->type) {
+                    case LV_FREETYPE_OUTLINE_MOVE_TO:
+                        lv_vector_path_move_to(path, &pnt);
+                        break;
+                    case LV_FREETYPE_OUTLINE_LINE_TO:
+                        lv_vector_path_line_to(path, &pnt);
+                        break;
+                    case LV_FREETYPE_OUTLINE_CUBIC_TO:
+                        lv_vector_path_cubic_to(path, &ctrl_pnt1, &ctrl_pnt2, &pnt);
+                        break;
+                    case LV_FREETYPE_OUTLINE_CONIC_TO:
+                        lv_vector_path_quad_to(path, &ctrl_pnt1, &pnt);
+                        break;
+                    case LV_FREETYPE_OUTLINE_END:
+                        /* It's not necessary to close the path */
+                        break;
+                }
+                break;
+            }
+
+        default:
+            LV_LOG_WARN("Invalid event code");
+            break;
+    }
+}
+
+#endif /* LV_USE_FREETYPE && LV_USE_VECTOR_GRAPHIC */
+
 static void draw_letter_cb(lv_layer_t * layer, const lv_area_t * clip_area, lv_draw_glyph_dsc_t * glyph_draw_dsc,
                            lv_draw_fill_dsc_t * fill_draw_dsc, const lv_area_t * fill_area, void * user_data)
 {
@@ -314,18 +440,18 @@ static void draw_letter_cb(lv_layer_t * layer, const lv_area_t * clip_area, lv_d
                 }
                 break;
 
-#if LV_USE_FREETYPE
+#if LV_USE_FREETYPE && LV_USE_VECTOR_GRAPHIC
             case LV_FONT_GLYPH_FORMAT_VECTOR: {
                     if(lv_freetype_is_outline_font(glyph_draw_dsc->g->resolved_font)) {
                         if(!glyph_draw_dsc->glyph_data) {
                             return;
                         }
 
-                        /* TODO: draw_letter_outline(draw_unit, clip_area, glyph_draw_dsc); */
+                        draw_letter_outline(draw_unit, clip_area, glyph_draw_dsc);
                     }
                 }
                 break;
-#endif /* LV_USE_FREETYPE */
+#endif /* LV_USE_FREETYPE && LV_USE_VECTOR_GRAPHIC */
 
             case LV_FONT_GLYPH_FORMAT_IMAGE: {
                     glyph_draw_dsc->glyph_data = lv_font_get_glyph_bitmap_internal(glyph_draw_dsc->g, glyph_draw_dsc->_draw_buf);
