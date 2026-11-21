@@ -1784,6 +1784,24 @@ static void nvg__calculateJoins(NVGcontext * ctx, float w, int lineJoin, float m
         }
 
         path->convex = (nleft == path->count) ? 1 : 0;
+
+        /* All the turns being to the left isn't enough to be convex: the contour of a star polygon, or of a glyph
+         * with overlapping parts, turns left at every corner too, but it turns around more than once.
+         * Filling it as a convex shape (a triangle fan without stencil) draws it wrong. */
+        if(path->convex) {
+            float turn = 0.0f;
+            p0 = &pts[path->count - 1];
+            p1 = &pts[0];
+            for(j = 0; j < path->count; j++) {
+                const float cross = p1->dx * p0->dy - p0->dx * p1->dy;
+                const float dot = p1->dx * p0->dx + p1->dy * p0->dy;
+                turn += atan2f(cross, dot);
+                p0 = p1++;
+            }
+
+            /* A convex contour turns by 2 * PI */
+            if(turn > 3.0f * NVG_PI) path->convex = 0;
+        }
     }
 }
 
