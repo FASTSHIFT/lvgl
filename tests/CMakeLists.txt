@@ -242,6 +242,11 @@ endif()
 
 lvgl_add_test_folder_if(NOT CONFIG_LV_CHECK_ARG_ASSERT_ON_FAIL test_cases/public_api)
 lvgl_get_test_files(TEST_CASE_FILES)
+# These test cases use the API of the software renderer, which is not built when
+# another renderer (e.g. VG-Lite) is the only one.
+if(NOT CONFIG_LV_USE_DRAW_SW)
+    list(FILTER TEST_CASE_FILES EXCLUDE REGEX "/test_draw_custom_handlers\\.c$")
+endif()
 
 file(GLOB_RECURSE TEST_HELPERS_FILES src/test_helpers/*.c)
 

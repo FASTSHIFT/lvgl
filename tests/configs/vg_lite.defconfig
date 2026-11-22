@@ -1,6 +1,11 @@
 # VG-Lite GPU rendering, simulated with ThorVG.
 
 CONFIG_LV_USE_DRAW_VG_LITE=y
+# VG-Lite is the only renderer: the descriptors it can't draw are dropped by the
+# draw dispatcher, there is no software renderer to fall back to. The tests also
+# cover these cases, e.g. the images of the decoders that decode in tiles (tjpgd)
+# are not drawn, and the test just has to survive it.
+# CONFIG_LV_USE_DRAW_SW is not set
 CONFIG_LV_USE_VG_LITE_THORVG=y
 CONFIG_LV_USE_THORVG_INTERNAL=y
 CONFIG_LV_DRAW_TRANSFORM_USE_MATRIX=y
